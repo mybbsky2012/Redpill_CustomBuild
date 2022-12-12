@@ -22,18 +22,32 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Create Issues comment
+        if: github.event_name == 'issues'
+        id: comment
+        uses: actions-cool/issues-helper@v3
+        with:
+          actions: 'create-comment'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.issue.number }}
+          body: | 
+            分析 title 和 body 内容 ..  
+            > ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}  
+            ----
+          emoji: heart
+
       - name: Set up Ruby 3
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.1.2
 
       - name: Set up Python 3
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
-          python-version: 3.8
-
-      - name: Checkout
-        uses: actions/checkout@main
+          python-version: '3.10'
 
       - name: Init Env
         run : |
@@ -121,422 +135,444 @@ jobs:
           fi
 
       - name: Get Build Info
-        uses: jannekem/run-python-script-action@v1.2
-        id: info
-        with:
-          script: |
-            import os, re, json, shutil, string, subprocess
+        shell: python
+        run: |
+          import os, re, json, shutil, string, subprocess
 
-            if __name__ == '__main__':
+          def set_output(name, value):
+              subprocess.call(["echo '{}={}' >> $GITHUB_ENV".format(name, value)], shell=True)
 
-                issues = 'false'
-                iscustom = 'true'
-                errinfo = ''
-                warinfo = ''
+          if __name__ == '__main__':
 
-                platform = ''
-                version = ''
-                config = ''
+              issues = 'false'
+              iscustom = 'true'
+              errinfo = ''
+              warinfo = ''
 
-                maxdisks = ''
-                maxlanport = ''
-                internalportcfg = ''
-                esataportcfg = ''
-                usbportcfg = ''
-                sn = ''
-                mac = ''
-                netif_num = ''
-                vid = ''
-                pid = ''
-                diskidxmap = ''
-                sataportmap = ''
-                sasidxmap = ''
+              repository = ''
+              platform = ''
+              version = ''
+              lkm = ''
 
-                dtb = ''
-                ext = ''
-                exp = 'pocopico'
-                jun = '0'
-                dev = '0'
+              config = ''
 
-                try:
-                    body = {}
-                    bodyOriginal = {}
-                    if '${{ github.event_name }}' == 'issues':
-                        if '${{ env.issuetitle }}'.lower().startswith('custom'):
-                            issues = 'true'
-                            bodyOriginal = json.loads('${{ env.issuebody }}')
-                        else:
-                            iscustom = 'false'
-                    else:
-                        bodyOriginal = json.loads('${{ inputs.body }}')
+              maxdisks = ''
+              maxlanport = ''
+              internalportcfg = ''
+              esataportcfg = ''
+              usbportcfg = ''
+              sn = ''
+              mac = ''
+              netif_num = ''
+              vid = ''
+              pid = ''
+              diskidxmap = ''
+              sataportmap = ''
+              sasidxmap = ''
 
-                    for k, v in bodyOriginal.items():
-                      body[k.lower()] = v
+              dtb = ''
+              ext = ''
 
-                    if len(body) == 0:
-                        iscustom = 'false'
-                        errinfo = 'body 错误, body is null'
-                    else:
-                        # l = lambda x: x.strip() if isinstance(x, str) else str(x)
-                        if 'platform' in body: platform = body['platform'].strip()
-                        if 'version' in body: version = body['version'].strip()
-                        if 'config' in body: config = body['config'] #l(body['config']).strip()
-                        
-                        if 'maxdisks' in body: maxdisks = body['maxdisks'].strip()
-                        if 'maxlanport' in body: maxlanport = body['maxlanport'].strip()
-                        if 'internalportcfg' in body: internalportcfg = body['internalportcfg'].strip()
-                        if 'esataportcfg' in body: esataportcfg = body['esataportcfg'].strip()
-                        if 'usbportcfg' in body: usbportcfg = body['usbportcfg'].strip()
-                        #if 'sn' in body: sn = body['sn'].strip()
-                        #if 'mac' in body: mac = body['mac'].strip()
-                        if 'netif_num' in body: netif_num = body['netif_num'].strip()
-                        if 'vid' in body: vid = body['vid'].strip()
-                        if 'pid' in body: pid = body['pid'].strip()
-                        if 'diskidxmap' in body: diskidxmap = body['diskidxmap'].strip()
-                        if 'sataportmap' in body: sataportmap = body['sataportmap'].strip()
-                        if 'sasidxmap' in body: sasidxmap = body['sasidxmap'].strip()
+              dev = '0'
 
-                        if 'dtb' in body: dtb = body['dtb'].strip()
-                        if 'ext' in body: ext = body['ext'].strip()
-                        if 'exp' in body: exp = body['exp'].strip()
-                        if 'jun' in body: jun = body['jun'].strip()
-                        if 'dev' in body: dev = body['dev'].strip()
+              try:
+                  body = {}
+                  bodyOriginal = {}
+                  if '${{ github.event_name }}' == 'issues':
+                      if '${{ env.issuetitle }}'.lower().startswith('custom'):
+                          issues = 'true'
+                          bodyOriginal = json.loads('${{ env.issuebody }}')
+                      else:
+                          iscustom = 'false'
+                  else:
+                      bodyOriginal = json.loads('${{ inputs.body }}')
 
-                except Exception as e:
-                    iscustom = 'false'
-                    errinfo = 'body 错误, 不符合JSON规范 {}.'.format(e)
+                  for k, v in bodyOriginal.items():
+                    body[k.lower()] = v
 
-                platforms = ['DS918+', 'DS920+', 'DS1520+', 'DS1621+', 'DS1821+', 'DS2422+', 'DS3615xs', 'DS3617xs', 'DS3622xs+', 'DVA1622', 'DVA3221', 'FS2500', 'FS3600', 'RS4021xs+']
-                if iscustom == 'true' and not platform in platforms:
-                    iscustom = 'false'
-                    errinfo = 'platform 参数错误, 当前仅支持 {}.'.format(', '.join(platforms))
+                  if len(body) == 0:
+                      iscustom = 'false'
+                      errinfo = 'body 错误, body is null'
+                  else:
+                      # l = lambda x: x.strip() if isinstance(x, str) else str(x)
+                      if 'repository' in body: repository = body['repository'].strip()
+                      if 'platform' in body: platform = body['platform'].strip()
+                      if 'version' in body: version = body['version'].strip()
+                      if 'lkm' in body: lkm = body['lkm'].strip()
 
-                versions = ['7.1.1-42962', '7.1.0-42661', '7.0.1-42218', '6.2.4-25556']
-                if iscustom == 'true' and not version in versions:
-                    iscustom = 'false'
-                    errinfo = 'version 参数错误, 当前仅支持 {}.'.format(', '.join(versions))
+                      if 'config' in body: config = body['config'] #l(body['config']).strip()
+                      
+                      if 'maxdisks' in body: maxdisks = body['maxdisks'].strip()
+                      if 'maxlanport' in body: maxlanport = body['maxlanport'].strip()
+                      if 'internalportcfg' in body: internalportcfg = body['internalportcfg'].strip()
+                      if 'esataportcfg' in body: esataportcfg = body['esataportcfg'].strip()
+                      if 'usbportcfg' in body: usbportcfg = body['usbportcfg'].strip()
+                      #if 'sn' in body: sn = body['sn'].strip()
+                      #if 'mac' in body: mac = body['mac'].strip()
+                      if 'netif_num' in body: netif_num = body['netif_num'].strip()
+                      if 'vid' in body: vid = body['vid'].strip()
+                      if 'pid' in body: pid = body['pid'].strip()
+                      if 'diskidxmap' in body: diskidxmap = body['diskidxmap'].strip()
+                      if 'sataportmap' in body: sataportmap = body['sataportmap'].strip()
+                      if 'sasidxmap' in body: sasidxmap = body['sasidxmap'].strip()
 
-                if config != '':
-                    try:
-                        if isinstance(config, str):
-                            config = json.loads(config)
-                        if isinstance(config, dict):
-                            config = json.dumps(config)
-                            json.loads(config)
-                        else:
-                            if iscustom == 'true':
-                                iscustom = 'false'
-                                errinfo = 'config 参数错误, 不符合JSON规范.'
-                    except Exception as e:
-                        if iscustom == 'true':
-                            iscustom = 'false'
-                            errinfo = 'config 参数错误, 不符合JSON规范 {}.'.format(e)
+                      if 'dtb' in body: dtb = body['dtb'].strip()
+                      if 'ext' in body: ext = body['ext'].strip()
+                      if 'dev' in body: dev = body['dev'].strip()
 
-                if iscustom == 'true' and maxdisks != '' and (not maxdisks.isdigit() or int(maxdisks) < 1 or int(maxdisks) > 32):
-                    iscustom = 'false'
-                    errinfo = 'maxdisks 参数错误, 请填写 1 - 32 之间的数字.'
+              except Exception as e:
+                  iscustom = 'false'
+                  errinfo = 'body 错误, 不符合JSON规范 {}.'.format(e)
 
-                if iscustom == 'true' and maxlanport != '' and (not maxlanport.isdigit() or int(maxlanport) < 0 or int(maxlanport) > 31):
-                    iscustom = 'false'
-                    errinfo = 'maxlanport 参数错误, 请填写 0 - 31 之间的数字.'
+              loads = {}
+              with open('loads.json', mode="r") as f:
+                  loads = json.loads(f.read())
 
-                if iscustom == 'true' and internalportcfg != '':
-                    if len(internalportcfg) > 2 and internalportcfg[:2].lower().startswith('0x') and all(c in string.hexdigits for c in internalportcfg[2:]):
-                        pass
-                    elif all(c in string.hexdigits for c in internalportcfg):
-                        internalportcfg = '0x' + internalportcfg
-                    else:
-                        iscustom = 'false'
-                        errinfo = 'internalportcfg 参数错误, 请填写十六进制数.'
+              repositorys = loads.keys()
+              if iscustom == 'true' and not repository in repositorys:
+                  iscustom = 'false'
+                  errinfo = 'repository 参数错误, 当前仅支持 {}.'.format(', '.join(repositorys))
 
-                if iscustom == 'true' and esataportcfg != '':
-                    if len(esataportcfg) > 2 and esataportcfg[:2].lower().startswith('0x') and all(c in string.hexdigits for c in esataportcfg[2:]):
-                        pass
-                    elif all(c in string.hexdigits for c in esataportcfg):
-                        esataportcfg = '0x' + esataportcfg
-                    else:
-                        iscustom = 'false'
-                        errinfo = 'esataportcfg 参数错误, 请填写十六进制数.'
+              if iscustom == 'true':
+                  platforms = loads[repository].keys()
+                  if not platform in platforms:
+                      iscustom = 'false'
+                      errinfo = 'platform 参数错误, 当前仅支持 {}.'.format(', '.join(platforms))
 
-                if iscustom == 'true' and usbportcfg != '':
-                    if len(usbportcfg) > 2 and usbportcfg[:2].lower().startswith('0x') and all(c in string.hexdigits for c in usbportcfg[2:]):
-                        pass
-                    elif all(c in string.hexdigits for c in usbportcfg):
-                        usbportcfg = '0x' + usbportcfg
-                    else:
-                        iscustom = 'false'
-                        errinfo = 'usbportcfg 参数错误, 请填写十六进制数.'
+              if iscustom == 'true':
+                  versions = loads[repository][platform]
+                  if not version in versions:
+                      iscustom = 'false'
+                      errinfo = 'version 参数错误, 当前仅支持 {}.'.format(', '.join(versions))
 
-                if iscustom == 'true' and sn != '':
-                    warinfo = 'sn'
-                    if not sn.isalnum():
-                        iscustom = 'false'
-                        errinfo = 'sn 参数错误.'
-                        warinfo = 'sn'
+              if iscustom == 'true':
+                  lkms = []
+                  with open('lkms.json', mode="r") as f:
+                      keys = json.loads(f.read())['wjz304'][platform.replace('+', 'p').lower() + '_' + version.split('-')[-1]].keys()
+                      lkms = [x for x in keys if not x.endswith('*') and not x.endswith('#')]
+                  if lkm == '':
+                      lkm = lkms[0]
+                  if not lkm in lkms:
+                      iscustom = 'false'
+                      errinfo = 'lkm 参数错误, 当前仅支持 {}.'.format(', '.join(lkms))
 
-                if iscustom == 'true' and mac != '':
-                    warinfo = 'mac' if warinfo == '' else 'sn, mac'
-                    macs = [x.strip() for x in re.split(',| |\|', mac) if x.strip() != '']
-                    if len(macs) > 0 or len(macs) <= 8:
-                        mac = ','.join(macs)
-                    else:
-                        iscustom = 'false'
-                        errinfo = 'mac 参数错误.'
+              if config != '':
+                  try:
+                      if isinstance(config, str):
+                          config = json.loads(config)
+                      if isinstance(config, dict):
+                          config = json.dumps(config)
+                          json.loads(config)
+                      else:
+                          if iscustom == 'true':
+                              iscustom = 'false'
+                              errinfo = 'config 参数错误, 不符合JSON规范.'
+                  except Exception as e:
+                      if iscustom == 'true':
+                          iscustom = 'false'
+                          errinfo = 'config 参数错误, 不符合JSON规范 {}.'.format(e)
 
-                if iscustom == 'true' and netif_num != '' and (not netif_num.isdigit() or int(netif_num) < 1 or int(netif_num) > 8):
-                    iscustom = 'false'
-                    errinfo = 'netif_num 参数错误, 请填写 1 - 8 之间的数字.'
+              if iscustom == 'true' and maxdisks != '' and (not maxdisks.isdigit() or int(maxdisks) < 1 or int(maxdisks) > 48):
+                  iscustom = 'false'
+                  errinfo = 'maxdisks 参数错误, 请填写 1 - 48 之间的数字.'
 
-                if iscustom == 'true' and mac != '' and netif_num != '' and int(netif_num) != len(mac.split(',')):
-                    iscustom = 'false'
-                    errinfo = 'netif_num 应该与 mac 的个数相等, 请填写匹配的数值.'
+              if iscustom == 'true' and maxlanport != '' and (not maxlanport.isdigit() or int(maxlanport) < 0 or int(maxlanport) > 47):
+                  iscustom = 'false'
+                  errinfo = 'maxlanport 参数错误, 请填写 0 - 47 之间的数字.'
 
-                if iscustom == 'true' and vid != '':
-                    if len(vid) == 6 and vid.lower().startswith('0x') and all(c in string.hexdigits for c in vid[2:]):
-                        pass
-                    elif len(vid) == 4 and all(c in string.hexdigits for c in vid):
-                        vid = '0x' + vid
-                    else:
-                        iscustom = 'false'
-                        errinfo = 'vid 参数错误, 请填写十六进制数.'
+              if iscustom == 'true' and internalportcfg != '':
+                  if len(internalportcfg) > 2 and internalportcfg[:2].lower().startswith('0x') and all(c in string.hexdigits for c in internalportcfg[2:]):
+                      pass
+                  elif all(c in string.hexdigits for c in internalportcfg):
+                      internalportcfg = '0x' + internalportcfg
+                  else:
+                      iscustom = 'false'
+                      errinfo = 'internalportcfg 参数错误, 请填写十六进制数.'
 
-                if iscustom == 'true' and pid != '':
-                    if len(pid) == 6 and pid.lower().startswith('0x') and all(c in string.hexdigits for c in pid[2:]):
-                        pass
-                    elif len(pid) == 4 and all(c in string.hexdigits for c in pid):
-                        pid = '0x' + pid
-                    else:
-                        iscustom = 'false'
-                        errinfo = 'pid 参数错误, 请填写十六进制数.'
+              if iscustom == 'true' and esataportcfg != '':
+                  if len(esataportcfg) > 2 and esataportcfg[:2].lower().startswith('0x') and all(c in string.hexdigits for c in esataportcfg[2:]):
+                      pass
+                  elif all(c in string.hexdigits for c in esataportcfg):
+                      esataportcfg = '0x' + esataportcfg
+                  else:
+                      iscustom = 'false'
+                      errinfo = 'esataportcfg 参数错误, 请填写十六进制数.'
 
-                if iscustom == 'true' and ((vid != '' and pid == '') or (vid == '' and pid != '')):
-                    iscustom = 'false'
-                    errinfo = 'vid 和 pid 参数不可单独定制, 应成对出现, 请填写完整的两个参数.'
+              if iscustom == 'true' and usbportcfg != '':
+                  if len(usbportcfg) > 2 and usbportcfg[:2].lower().startswith('0x') and all(c in string.hexdigits for c in usbportcfg[2:]):
+                      pass
+                  elif all(c in string.hexdigits for c in usbportcfg):
+                      usbportcfg = '0x' + usbportcfg
+                  else:
+                      iscustom = 'false'
+                      errinfo = 'usbportcfg 参数错误, 请填写十六进制数.'
 
-                if iscustom == 'true' and diskidxmap != '' and not all(c in string.hexdigits for c in diskidxmap):
-                    iscustom = 'false'
-                    errinfo = 'diskidxmap 参数错误, 请填写十六进制数..'
-                
-                if iscustom == 'true' and sataportmap != '' and not sataportmap.isdigit():
-                    iscustom = 'false'
-                    errinfo = 'sataportmap 参数错误, 请填写数字.'
-                
-                if iscustom == 'true' and sasidxmap != '' and not sasidxmap.isdigit():
-                    iscustom = 'false'
-                    errinfo = 'sasidxmap 参数错误, 请填写数字.'
+              if iscustom == 'true' and sn != '':
+                  warinfo = 'sn'
+                  if not sn.isalnum():
+                      iscustom = 'false'
+                      errinfo = 'sn 参数错误.'
+                      warinfo = 'sn'
 
-                if iscustom == 'true' and ((diskidxmap != '' and sataportmap == '') or (diskidxmap == '' and sataportmap != '') or len(diskidxmap) < len(sataportmap)):
-                    iscustom = 'false'
-                    errinfo = 'diskidxmap 和 sataportmap 参数不可单独定制, 且 diskidxmap的位数应该为sataportmap位数的2倍.'
+              if iscustom == 'true' and mac != '':
+                  warinfo = 'mac' if warinfo == '' else 'sn, mac'
+                  macs = [x.strip() for x in re.split(',| |\|', mac) if x.strip() != '']
+                  if len(macs) > 0 or len(macs) <= 8:
+                      mac = ','.join(macs)
+                  else:
+                      iscustom = 'false'
+                      errinfo = 'mac 参数错误.'
 
-                if iscustom == 'true' and dtb != '':
-                    url = dtb
-                    try:
-                        try:
-                            import wget, filetype
-                        except ModuleNotFoundError:
-                            os.system('pip3 install wget filetype')
-                            import wget, filetype
-                    
-                        res = wget.download(url)
-                        if res:
-                            down = res
-                            kind = filetype.guess(down)
-                            name = 'user'
-                            if os.path.exists('extract'):  
-                                shutil.rmtree('extract')
-                            if kind != None and kind.extension == 'zip':
-                                import zipfile
-                                z = zipfile.ZipFile(down, 'r')
-                                z.extractall('extract')
-                            if kind != None and kind.extension in ['tar', 'gz']:
-                                import tarfile
-                                z = tarfile.open(down) 
-                                z.extractall('extract')
-                            if os.path.exists('extract'):
-                                isfind = False
-                                for root, dirs, files in os.walk('extract'):
-                                    for file in files:
-                                        if file.endswith('.dts') or file.endswith('.dtb'):
-                                            isfind = True
-                                            down = name + os.path.splitext(file)[-1]
-                                            shutil.move(os.path.join(root, file), down)
-                                            break
-                                    if isfind is True:
-                                        break
+              if iscustom == 'true' and netif_num != '' and (not netif_num.isdigit() or int(netif_num) < 1 or int(netif_num) > 8):
+                  iscustom = 'false'
+                  errinfo = 'netif_num 参数错误, 请填写 1 - 8 之间的数字.'
 
-                            if os.path.exists(down) and (down.endswith('dts') or down.endswith('dtb')):
-                                if down.endswith('dts'):
-                                    wget.download('https://raw.githubusercontent.com/pocopico/rp-ext/main/redpill-dtb-static/releases/dtc')
-                                    if os.path.exists('dtc'):
-                                        print('./dtc -q -I dts -O dtb {} >{}.dtb'.format(down, name))
-                                        os.system('sudo chmod a+x dtc')
-                                        # os.system('sudo ./dtc -q -I dts -O dtb {} >{}.dtb'.format(down, name))
-                                        p = subprocess.Popen('sudo ./dtc -q -I dts -O dtb {} >{}.dtb'.format(down, name), shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                                        errinfo = p.stderr.read().decode('utf-8')
-                                        if os.path.exists('{}.dtb'.format(name)) and os.path.getsize('{}.dtb'.format(name)) > 0:
-                                            print('dtc ok ...')
-                                            dtb = os.path.abspath('{}.dtb'.format(name))
-                                        else:
-                                            iscustom = 'false'
-                                            errinfo = 'dtb 参数错误, dts文件内容存在错误 <{}>.'.format(errinfo.replace('\r', '').replace('\n', ' '))
-                                    else:
-                                        iscustom = 'false'
-                                        errinfo = 'dtb 参数错误, 下载 dtc(dts->dtb tools) 失败, 可能是服务器压力过大, 请稍后重试, 或者直接使用 dtb 文件跳过转换.'
-                                else:
-                                    dtb = os.path.abspath(down)
-                            else:
-                                iscustom = 'false'
-                                errinfo = 'dtb 参数错误, 该url下载的文件不是所支持的格式.'
-                    except ValueError as e:
-                        iscustom = 'false'
-                        errinfo = 'dtb 参数错误, {}, 请填写 dts/dtb 文件有效的 http(s) 下载链接.'.format(e)
-                    except Exception as e:
-                        iscustom = 'false'
-                        errinfo = 'dtb 参数错误, {}, 请稍后重试.'.format(e)
+              if iscustom == 'true' and mac != '' and netif_num != '' and int(netif_num) != len(mac.split(',')):
+                  iscustom = 'false'
+                  errinfo = 'netif_num 应该与 mac 的个数相等, 请填写匹配的数值.'
 
-                if iscustom == 'true' and ext != '':
-                    rpKey = platform.replace('+', 'p').lower() + '_' + version.split('-')[-1]
-                    rpExts = []
-                    with open('exts.json', mode="r") as f:
-                        extsjson = json.loads(f.read())
-                        extskey = 'pocopico'
-                        if dev == '1':
-                            extskey = 'wjz304'
-                        if extskey in extsjson and rpKey in extsjson[extskey]:
-                            rpExts = list(extsjson[extskey][rpKey].keys())
-                    extdels = [x.strip() for x in re.split(',| |\|', ext) if x.strip() != '' and x.strip().startswith('-')]
-                    ext3rds = [x.strip() for x in re.split(',| |\|', ext) if x.strip() != '' and x.strip().startswith('http')]
-                    extpocs = [x.strip() for x in re.split(',| |\|', ext) if x.strip() != '' and not x.strip().startswith('-') and not x.strip().startswith('http')]
-                    ext = ''
-                    while True:
-                        if len(extdels) > 0:
-                            rpDels = ['-boot-wait', '-acpid2', '-misc', '-virtio']
-                            extc = [x for x in extdels if x not in rpDels]
-                            if len(extc) > 0:
-                                iscustom = 'false'
-                                errinfo = 'ext 参数错误, "{}" 无效, 删除必备驱动当前仅支持 "{}".'.format(extc, ','.join(rpDels))
-                                break
-                            if ext != '':
-                                ext += ','
-                            ext += ','.join(extdels)
-                        if len(extpocs) > 0:
-                            if len(rpExts) < 0:
-                                iscustom = 'false'
-                                errinfo = 'ext 参数错误, 该模式不存在 "{}" 对应的驱动, 请尝试切换模式或者使用 http(s) 链接驱动.'.format(rpKey)      
-                                break
-                            extc = [x for x in list(set(extpocs) - set(rpExts)) if type(x) == str]
-                            if len(extc) > 0:
-                                iscustom = 'false'
-                                errinfo = 'ext 参数错误, "{}" 不在 exts.json 中, 请填写 exts.json 中存在的名称(no */#).'.format(','.join(extc))       
-                                break
-                            extc = [x for x in extpocs if x.endswith('*') or x.endswith('#')]
-                            if len(extc) > 0:
-                                iscustom = 'false'
-                                errinfo = 'ext 参数错误, "{}" 无效. (* 结尾的为无效驱动, # 结尾的为sha256错误驱动.).'.format(','.join(extc))
-                                break
-                            if ext != '':
-                                ext += ','
-                            ext += ','.join(extpocs)
-                        if len(ext3rds) > 0:
-                            extc = [x for x in ext3rds if not x.endswith('.json')]
-                            if len(extc) > 0:
-                                iscustom = 'false'
-                                errinfo = 'ext 参数错误, "{}" 无效. (* 结尾的为无效驱动, # 结尾的为sha256错误驱动.).'.format(','.join(extc))
-                                break
-                            if ext != '':
-                                ext += ','
-                            ext += ','.join(ext3rds)
+              if iscustom == 'true' and vid != '':
+                  if len(vid) == 6 and vid.lower().startswith('0x') and all(c in string.hexdigits for c in vid[2:]):
+                      pass
+                  elif len(vid) == 4 and all(c in string.hexdigits for c in vid):
+                      vid = '0x' + vid
+                  else:
+                      iscustom = 'false'
+                      errinfo = 'vid 参数错误, 请填写十六进制数.'
 
-                        if ext == '':
-                            iscustom = 'false'
-                            errinfo = 'ext 参数错误. 无效的name, 无效的链接.'
-                        break
+              if iscustom == 'true' and pid != '':
+                  if len(pid) == 6 and pid.lower().startswith('0x') and all(c in string.hexdigits for c in pid[2:]):
+                      pass
+                  elif len(pid) == 4 and all(c in string.hexdigits for c in pid):
+                      pid = '0x' + pid
+                  else:
+                      iscustom = 'false'
+                      errinfo = 'pid 参数错误, 请填写十六进制数.'
 
-                if iscustom == 'true' and not exp in ['pocopico', 'jumkey']:
-                    iscustom = 'false'
-                    errinfo = 'exp 参数错误, 当前仅支持 pocopico, jumkey.'
+              if iscustom == 'true' and ((vid != '' and pid == '') or (vid == '' and pid != '')):
+                  iscustom = 'false'
+                  errinfo = 'vid 和 pid 参数不可单独定制, 应成对出现, 请填写完整的两个参数.'
 
-                if iscustom == 'true' and not jun in ['0', '1']:
-                    iscustom = 'false'
-                    errinfo = 'jun 参数错误, 当前仅支持 "0", "1".'
+              if iscustom == 'true' and diskidxmap != '' and not all(c in string.hexdigits for c in diskidxmap):
+                  iscustom = 'false'
+                  errinfo = 'diskidxmap 参数错误, 请填写十六进制数..'
+              
+              if iscustom == 'true' and sataportmap != '' and not sataportmap.isdigit():
+                  iscustom = 'false'
+                  errinfo = 'sataportmap 参数错误, 请填写数字.'
+              
+              if iscustom == 'true' and sasidxmap != '' and not sasidxmap.isdigit():
+                  iscustom = 'false'
+                  errinfo = 'sasidxmap 参数错误, 请填写数字.'
 
-                if iscustom == 'true' and not dev in ['0', '1']:
-                    dev = '0'
+              if iscustom == 'true' and ((diskidxmap != '' and sataportmap == '') or (diskidxmap == '' and sataportmap != '') or len(diskidxmap) < len(sataportmap)):
+                  iscustom = 'false'
+                  errinfo = 'diskidxmap 和 sataportmap 参数不可单独定制, 且 diskidxmap的位数应该为sataportmap位数的2倍.'
 
-                set_output('issues', issues)
-                set_output('iscustom', iscustom)
-                set_output('errinfo', errinfo)
-                set_output('warinfo', warinfo)
+              if iscustom == 'true' and dtb != '': # and dtb != 'auto':
+                  url = dtb
+                  try:
+                      try:
+                          import wget, filetype
+                      except ModuleNotFoundError:
+                          os.system('pip3 install wget filetype')
+                          import wget, filetype
+                  
+                      res = wget.download(url)
+                      if res:
+                          down = res
+                          kind = filetype.guess(down)
+                          name = 'user'
+                          if os.path.exists('extract'):  
+                              shutil.rmtree('extract')
+                          if kind != None and kind.extension == 'zip':
+                              import zipfile
+                              z = zipfile.ZipFile(down, 'r')
+                              z.extractall('extract')
+                          if kind != None and kind.extension in ['tar', 'gz']:
+                              import tarfile
+                              z = tarfile.open(down) 
+                              z.extractall('extract')
+                          if os.path.exists('extract'):
+                              isfind = False
+                              for root, dirs, files in os.walk('extract'):
+                                  for file in files:
+                                      if file.endswith('.dts') or file.endswith('.dtb'):
+                                          isfind = True
+                                          down = name + os.path.splitext(file)[-1]
+                                          shutil.move(os.path.join(root, file), down)
+                                          break
+                                  if isfind is True:
+                                      break
 
-                set_output('platform', platform)
-                set_output('version', version)
-                set_output('config', config)
-                set_output('maxdisks', maxdisks)
-                set_output('maxlanport', maxlanport)
-                set_output('internalportcfg', internalportcfg)
-                set_output('esataportcfg', esataportcfg)
-                set_output('usbportcfg', usbportcfg)
-                set_output('sn', sn)
-                set_output('mac', mac)
-                set_output('netif_num', netif_num)
-                set_output('vid', vid)
-                set_output('pid', pid)
-                set_output('diskidxmap', diskidxmap)
-                set_output('sataportmap', sataportmap)
-                set_output('sasidxmap', sasidxmap)
-                set_output('dtb', dtb)
-                set_output('ext', ext)
-                set_output('exp', exp)
-                set_output('jun', jun)
-                set_output('dev', dev)
+                          if os.path.exists(down) and (down.endswith('dts') or down.endswith('dtb')):
+                              if down.endswith('dts'):
+                                  wget.download('https://raw.githubusercontent.com/pocopico/rp-ext/main/redpill-dtb-static/releases/dtc')
+                                  if os.path.exists('dtc'):
+                                      print('./dtc -q -I dts -O dtb {} >{}.dtb'.format(down, name))
+                                      os.system('sudo chmod a+x dtc')
+                                      # os.system('sudo ./dtc -q -I dts -O dtb {} >{}.dtb'.format(down, name))
+                                      p = subprocess.Popen('sudo ./dtc -q -I dts -O dtb {} >{}.dtb'.format(down, name), shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                      errinfo = p.stderr.read().decode('utf-8')
+                                      if os.path.exists('{}.dtb'.format(name)) and os.path.getsize('{}.dtb'.format(name)) > 0:
+                                          print('dtc ok ...')
+                                          dtb = os.path.abspath('{}.dtb'.format(name))
+                                      else:
+                                          iscustom = 'false'
+                                          errinfo = 'dtb 参数错误, dts文件内容存在错误 <{}>.'.format(errinfo.
+                                          lace('\r', '').replace('\n', ' '))
+                                  else:
+                                      iscustom = 'false'
+                                      errinfo = 'dtb 参数错误, 下载 dtc(dts->dtb tools) 失败, 可能是服务器压力过大, 请稍后重试, 或者直接使用 dtb 文件跳过转换.'
+                              else:
+                                  dtb = os.path.abspath(down)
+                          else:
+                              iscustom = 'false'
+                              errinfo = 'dtb 参数错误, 该url下载的文件不是所支持的格式.'
+                  except ValueError as e:
+                      iscustom = 'false'
+                      errinfo = 'dtb 参数错误, {}, 请填写 dts/dtb 文件有效的 http(s) 下载链接.'.format(e)
+                  except Exception as e:
+                      iscustom = 'false'
+                      errinfo = 'dtb 参数错误, {}, 请稍后重试.'.format(e)
+
+              if iscustom == 'true' and ext != '':
+                  rpKey = platform.replace('+', 'p').lower() + '_' + version.split('-')[-1]
+                  rpExts = []
+                  with open('exts.json', mode="r") as f:
+                      extsjson = json.loads(f.read())
+                      extskey = 'pocopico'
+                      if dev == '1':
+                          extskey = 'wjz304'
+                      if extskey in extsjson and rpKey in extsjson[extskey]:
+                          rpExts = list(extsjson[extskey][rpKey].keys())
+                  extdels = [x.strip() for x in re.split(',| |\|', ext) if x.strip() != '' and x.strip().startswith('-')]
+                  ext3rds = [x.strip() for x in re.split(',| |\|', ext) if x.strip() != '' and x.strip().startswith('http')]
+                  extpocs = [x.strip() for x in re.split(',| |\|', ext) if x.strip() != '' and not x.strip().startswith('-') and not x.strip().startswith('http')]
+                  ext = ''
+                  while True:
+                      if len(extdels) > 0:
+                          rpDels = ['-boot-wait', '-acpid2', '-misc', '-virtio', '-dtb']
+                          extc = [x for x in extdels if x not in rpDels]
+                          if len(extc) > 0:
+                              iscustom = 'false'
+                              errinfo = 'ext 参数错误, "{}" 无效, 删除必备驱动当前仅支持 "{}".'.format(extc, ','.join(rpDels))
+                              break
+                          if ext != '':
+                              ext += ','
+                          ext += ','.join(extdels)
+                      if len(extpocs) > 0:
+                          if len(rpExts) < 0:
+                              iscustom = 'false'
+                              errinfo = 'ext 参数错误, 该模式不存在 "{}" 对应的驱动, 请尝试切换模式或者使用 http(s) 链接驱动.'.format(rpKey)      
+                              break
+                          extc = [x for x in list(set(extpocs) - set(rpExts)) if type(x) == str]
+                          if len(extc) > 0:
+                              iscustom = 'false'
+                              errinfo = 'ext 参数错误, "{}" 不在 exts.json 中, 请填写 exts.json 中存在的名称(no */#).'.format(','.join(extc))       
+                              break
+                          extc = [x for x in extpocs if x.endswith('*') or x.endswith('#')]
+                          if len(extc) > 0:
+                              iscustom = 'false'
+                              errinfo = 'ext 参数错误, "{}" 无效. (* 结尾的为无效驱动, # 结尾的为sha256错误驱动.).'.format(','.join(extc))
+                              break
+                          if ext != '':
+                              ext += ','
+                          ext += ','.join(extpocs)
+                      if len(ext3rds) > 0:
+                          extc = [x for x in ext3rds if not x.endswith('.json')]
+                          if len(extc) > 0:
+                              iscustom = 'false'
+                              errinfo = 'ext 参数错误, "{}" 无效. (* 结尾的为无效驱动, # 结尾的为sha256错误驱动.).'.format(','.join(extc))
+                              break
+                          if ext != '':
+                              ext += ','
+                          ext += ','.join(ext3rds)
+
+                      if ext == '':
+                          iscustom = 'false'
+                          errinfo = 'ext 参数错误. 无效的name, 无效的链接.'
+                      break
+
+              if iscustom == 'true' and not dev in ['0', '1']:
+                  dev = '0'
+
+              set_output('issues', issues)
+              set_output('iscustom', iscustom)
+              set_output('errinfo', errinfo)
+              set_output('warinfo', warinfo)
+
+              set_output('repository', repository)
+              set_output('platform', platform)
+              set_output('version', version)
+              set_output('lkm', lkm)
+
+              set_output('config', config)
+              set_output('maxdisks', maxdisks)
+              set_output('maxlanport', maxlanport)
+              set_output('internalportcfg', internalportcfg)
+              set_output('esataportcfg', esataportcfg)
+              set_output('usbportcfg', usbportcfg)
+              set_output('sn', sn)
+              set_output('mac', mac)
+              set_output('netif_num', netif_num)
+              set_output('vid', vid)
+              set_output('pid', pid)
+              set_output('diskidxmap', diskidxmap)
+              set_output('sataportmap', sataportmap)
+              set_output('sasidxmap', sasidxmap)
+              set_output('dtb', dtb)
+              set_output('ext', ext)
+              set_output('dev', dev)
 
       - name: Echo Build Info
         run: |
-          echo issues:            '${{ steps.info.outputs.issues }}'
-          echo iscustom:          '${{ steps.info.outputs.iscustom }}'
-          echo errinfo:           '${{ steps.info.outputs.errinfo }}'
-          echo warinfo:           '${{ steps.info.outputs.warinfo }}'
+          echo issues:            '${{ env.issues }}'
+          echo iscustom:          '${{ env.iscustom }}'
+          echo errinfo:           '${{ env.errinfo }}'
+          echo warinfo:           '${{ env.warinfo }}'
 
-          echo platform:          '${{ steps.info.outputs.platform }}'
-          echo version:           '${{ steps.info.outputs.version }}'
-          echo config:            '${{ steps.info.outputs.config }}'
+          echo repository:        '${{ env.repository }}'
+          echo platform:          '${{ env.platform }}'
+          echo version:           '${{ env.version }}'
+          echo lkm:               '${{ env.lkm }}'
 
-          echo maxdisks:          '${{ steps.info.outputs.maxdisks }}'
-          echo maxlanport:        '${{ steps.info.outputs.maxlanport }}'
-          echo internalportcfg:   '${{ steps.info.outputs.internalportcfg }}'
-          echo esataportcfg:      '${{ steps.info.outputs.esataportcfg }}'
-          echo usbportcfg:        '${{ steps.info.outputs.usbportcfg }}'
-          echo sn:                '${{ steps.info.outputs.sn }}'
-          echo mac:               '${{ steps.info.outputs.mac }}'
-          echo netif_num:         '${{ steps.info.outputs.netif_num }}'
-          echo vid:               '${{ steps.info.outputs.vid }}'
-          echo pid:               '${{ steps.info.outputs.pid }}'
-          echo diskidxmap:        '${{ steps.info.outputs.diskidxmap }}'
-          echo sataportmap:       '${{ steps.info.outputs.sataportmap }}'
-          echo sasidxmap:         '${{ steps.info.outputs.sasidxmap }}'
-          echo dtb:               '${{ steps.info.outputs.dtb }}'
-          echo ext:               '${{ steps.info.outputs.ext }}'
-          echo exp:               '${{ steps.info.outputs.exp }}'
-          echo jun:               '${{ steps.info.outputs.jun }}'
-          echo dev:               '${{ steps.info.outputs.dev }}'
+          echo config:            '${{ env.config }}'
+
+          echo maxdisks:          '${{ env.maxdisks }}'
+          echo maxlanport:        '${{ env.maxlanport }}'
+          echo internalportcfg:   '${{ env.internalportcfg }}'
+          echo esataportcfg:      '${{ env.esataportcfg }}'
+          echo usbportcfg:        '${{ env.usbportcfg }}'
+          echo sn:                '${{ env.sn }}'
+          echo mac:               '${{ env.mac }}'
+          echo netif_num:         '${{ env.netif_num }}'
+          echo vid:               '${{ env.vid }}'
+          echo pid:               '${{ env.pid }}'
+          echo diskidxmap:        '${{ env.diskidxmap }}'
+          echo sataportmap:       '${{ env.sataportmap }}'
+          echo sasidxmap:         '${{ env.sasidxmap }}'
+          echo dtb:               '${{ env.dtb }}'
+          echo ext:               '${{ env.ext }}'
+          echo dev:               '${{ env.dev }}'
 
       - name: Add Issues labels
-        if: steps.info.outputs.issues == 'true' && steps.info.outputs.iscustom == 'true'
+        if: env.issues == 'true' && env.iscustom == 'true'
         uses: actions-cool/issues-helper@v3
         with:
           actions: 'add-labels'
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ env.issuenumber }}
-          labels: 'custom'
+          labels: 'custom,${{ env.platform }}'
 
-      - name: Create Issues comment
-        if: steps.info.outputs.issues == 'true' && steps.info.outputs.iscustom == 'true'
+      - name: Update Comment Begin
+        if: env.issues == 'true' && env.iscustom == 'true'
         uses: actions-cool/issues-helper@v3
         with:
-          actions: 'create-comment'
+          actions: 'update-comment'
           token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: ${{ env.issuenumber }}
+          comment-id: ${{ steps.comment.outputs.comment-id }}
+          update-mode: replace
           body: |
             ${{ env.issueauth }} 您好.  
             您自定义的 Redpill 已开始构建. 请前往下面的 URL 查看详细信息.  
@@ -544,157 +580,181 @@ jobs:
             ----
           emoji: heart
 
-      - name: Create Issues comment
-        if: steps.info.outputs.issues == 'true' && steps.info.outputs.iscustom == 'false'
+      - name: Update Comment Error
+        if: env.issues == 'true' && env.iscustom == 'false'
         uses: actions-cool/issues-helper@v3
         with:
-          actions: 'create-comment'
+          actions: 'update-comment'
           token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: ${{ env.issuenumber }}
+          comment-id: ${{ steps.comment.outputs.comment-id }}
+          update-mode: replace
           body: |
             ${{ env.issueauth }} 您好.  
             您自定义 Redpill 所填写的信息有误, 无法触发编译, 请参考模板和错误提示对body进行修改并请重新触发编译(Close & Reopen).  
             `Error Info:`  
-            `${{ steps.info.outputs.errinfo }}`  
+            `${{ env.errinfo }}`  
             > ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}  
             ----
           emoji: confused
 
-      - name: Warning Issues comment
-        if: steps.info.outputs.issues == 'true' && steps.info.outputs.warinfo != ''
+      - name: Update Comment Warinfo
+        if: env.issues == 'true' && env.warinfo != ''
         uses: actions-cool/issues-helper@v3
         with:
-          actions: 'create-comment'
+          actions: 'update-comment'
           token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: ${{ env.issuenumber }}
+          comment-id: ${{ steps.comment.outputs.comment-id }}
+          update-mode: append
           body: |
+            >
+            ----
             ‼️‼️‼️ 
-            `Body 中含有自定义的 ${{ steps.info.outputs.warinfo }} 敏感信息, 为防止其他人盗用, 建议参考以下视频删除敏感信息(不影响本次编译).`  
+            `Body 中含有自定义的 ${{ env.warinfo }} 敏感信息, 为防止其他人盗用, 建议参考以下视频删除敏感信息(不影响本次编译).`  
               
             https://user-images.githubusercontent.com/5615843/187615519-53a6dcf5-a5e2-4731-8889-9eee8955a977.mp4  
             >
             ----
           emoji: eyes
 
-      - name: Create Config File
-        if: steps.info.outputs.iscustom == 'true'
-        uses: jannekem/run-python-script-action@v1.2
+      - name: Update Comment Invalid
+        if: env.issues == 'false'
+        uses: actions-cool/issues-helper@v3
         with:
-          script: |
-            import os, json
+          actions: 'update-comment'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          comment-id: ${{ steps.comment.outputs.comment-id }}
+          update-mode: replace
+          body: |
+            ${{ env.issueauth }} 您好.  
+            根据 title 和 body 内容的分析, 该 Issue 并非定制 Redpill. 将在管理员看到后会进行回复.  
+            > ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            ----
+          emoji: eyes
 
-            if __name__ == '__main__':
-                config = {
-                    "extra_cmdline": {
-                        "pid": "0x0001",
-                        "vid": "0x46f4",
-                        "sn": "",
-                        "mac1": ""
-                    },
-                    "synoinfo": {
-                        "internalportcfg": "0xffff",
-                        "maxlanport": "7"
-                    },
-                    "ramdisk_copy": {}
-                }
+      - name: Create Config File
+        if: env.iscustom == 'true'
+        shell: python
+        run: |
+          import os, json
 
-                dat = []
-                if '${{ steps.info.outputs.sn }}' == '' or '${{ steps.info.outputs.mac }}' == '':
-                    try:
-                        import wget
-                    except ModuleNotFoundError:
-                        os.system('pip3 install wget')
-                        import wget
-                    res = wget.download('https://raw.githubusercontent.com/pocopico/tinycore-redpill/main/serialnumbergen.sh', out='serialnumbergen.sh')
-                    os.system('sed -i "s|DS3622xsp|DS3622xs+|g" serialnumbergen.sh')
-                    os.system('sed -i "s|echo.*\$(generateMacAddress)|echo \$(generateMacAddress)|g" serialnumbergen.sh')
-                    os.system('sed -i "s|echo.*\$(generateSerial \$1)|echo \$(generateSerial \$1)|g" serialnumbergen.sh')
-                    platform = '${{ steps.info.outputs.platform }}'
-                    if platform == 'DS1520+': platform = 'DS920+'        # 当前不支持 DS1520+   算号
-                    if platform == 'DS1821+': platform = 'DS1621+'       # 当前不支持 DS1821+   算号
-                    if platform == 'DS2422+': platform = 'DS1621+'       # 当前不支持 DS2422+   算号
-                    if platform == 'FS2500': platform = 'DS1621+'        # 当前不支持 FS2500    算号
-                    if platform == 'FS3600': platform = 'DS3622xs+'      # 当前不支持 FS3600    算号
-                    if platform == 'RS4021xs+': platform = 'DS3622xs+'   # 当前不支持 RS4021xs+ 算号
-                    dat = os.popen('bash ./serialnumbergen.sh {}'.format(platform)).readlines()
+          if __name__ == '__main__':
+              config = {
+                  "extra_cmdline": {
+                      "pid": "0x0001",
+                      "vid": "0x46f4",
+                      "sn": "",
+                      "mac1": ""
+                  },
+                  "synoinfo": {
+                      "internalportcfg": "0xffff",
+                      "maxlanport": "7"
+                  },
+                  "ramdisk_copy": {}
+              }
 
-                if '${{ steps.info.outputs.config }}' != '':
-                    inconfig = json.loads('${{ steps.info.outputs.config }}')
-                    config.update(inconfig)
+              dat = []
+              if '${{ env.sn }}' == '' or '${{ env.mac }}' == '':
+                  # try:
+                  #     import wget
+                  # except ModuleNotFoundError:
+                  #     os.system('pip3 install wget')
+                  #     import wget
+                  # res = wget.download('https://raw.githubusercontent.com/pocopico/tinycore-redpill/main/serialnumbergen.sh', out='serialnumbergen.sh')
+                  # os.system('sed -i "s|DS3622xsp|DS3622xs+|g" serialnumbergen.sh')
+                  # os.system('sed -i "s|echo.*\$(generateMacAddress)|echo \$(generateMacAddress)|g" serialnumbergen.sh')
+                  # os.system('sed -i "s|echo.*\$(generateSerial \$1)|echo \$(generateSerial \$1)|g" serialnumbergen.sh')
+                  # platform = '${{ env.platform }}'
+                  # if platform == 'DS923+': platform = 'DS920+'         # 当前不支持 DS923+    算号
+                  # if platform == 'DS1520+': platform = 'DS920+'        # 当前不支持 DS1520+   算号
+                  # if platform == 'DS1821+': platform = 'DS1621+'       # 当前不支持 DS1821+   算号
+                  # if platform == 'DS2422+': platform = 'DS1621+'       # 当前不支持 DS2422+   算号
+                  # if platform == 'FS2500': platform = 'DS1621+'        # 当前不支持 FS2500    算号
+                  # if platform == 'FS3600': platform = 'DS3622xs+'      # 当前不支持 FS3600    算号
+                  # if platform == 'RS4021xs+': platform = 'DS3622xs+'   # 当前不支持 RS4021xs+ 算号
+                  # dat = os.popen('bash ./serialnumbergen.sh {}'.format(platform)).readlines()
 
-                if not "extra_cmdline" in config:
-                    config["extra_cmdline"] = {}
+                  platform = '${{ env.platform }}'
+                  dat = os.popen('bash ./serialnumbergen.sh {}'.format(platform)).readlines()
 
-                if '${{ steps.info.outputs.vid }}' != '':
-                    config["extra_cmdline"]["vid"] = '${{ steps.info.outputs.vid }}'
-                if '${{ steps.info.outputs.pid }}' != '':
-                    config["extra_cmdline"]["pid"] = '${{ steps.info.outputs.pid }}'
+              if '${{ env.config }}' != '':
+                  inconfig = json.loads('${{ env.config }}')
+                  config.update(inconfig)
 
-                if '${{ steps.info.outputs.sn }}' != '':
-                    config["extra_cmdline"]["sn"] = '${{ steps.info.outputs.sn }}'
-                if config["extra_cmdline"]["sn"] == '' and len(dat) == 2:
-                    config["extra_cmdline"]["sn"] = dat[1].strip()
+              if not "extra_cmdline" in config:
+                  config["extra_cmdline"] = {}
 
-                if '${{ steps.info.outputs.mac }}' != '':
-                    macs = '${{ steps.info.outputs.mac }}'.split(',')
-                    for index, item in enumerate(macs):
-                        config["extra_cmdline"]["mac{}".format(index+1)] = item.replace(':', '').upper()
-                    config["extra_cmdline"]["netif_num"] = len(macs)
-                else:
-                    netnum = 2
-                    if '${{ steps.info.outputs.netif_num }}' != '':
-                        netnum = int('${{ steps.info.outputs.netif_num }}')
-                    if len(dat) == 2:
-                        for index in range(netnum):
-                            config["extra_cmdline"]["mac{}".format(index+1)] = hex(int(dat[0].strip().replace(':', ''), 16) + index)[2:].rjust(12,'0').upper()
-                        config["extra_cmdline"]["netif_num"] = netnum
+              if '${{ env.vid }}' != '':
+                  config["extra_cmdline"]["vid"] = '${{ env.vid }}'
+              if '${{ env.pid }}' != '':
+                  config["extra_cmdline"]["pid"] = '${{ env.pid }}'
 
-                if '${{ steps.info.outputs.diskidxmap }}' != '':
-                    config["extra_cmdline"]["DiskIdxMap"] = '${{ steps.info.outputs.diskidxmap }}'
-                if '${{ steps.info.outputs.sataportmap }}' != '':
-                    config["extra_cmdline"]["SataPortMap"] = '${{ steps.info.outputs.sataportmap }}'
-                if '${{ steps.info.outputs.sasidxmap }}' != '':
-                    config["extra_cmdline"]["SasIdxMap"] = '${{ steps.info.outputs.sasidxmap }}'
+              if '${{ env.sn }}' != '':
+                  config["extra_cmdline"]["sn"] = '${{ env.sn }}'
+              if config["extra_cmdline"]["sn"] == '' and len(dat) == 2:
+                  config["extra_cmdline"]["sn"] = dat[1].strip()
+
+              if '${{ env.mac }}' != '':
+                  macs = '${{ env.mac }}'.split(',')
+                  for index, item in enumerate(macs):
+                      config["extra_cmdline"]["mac{}".format(index+1)] = item.replace(':', '').upper()
+                  config["extra_cmdline"]["netif_num"] = len(macs)
+              else:
+                  netnum = 2
+                  if '${{ env.netif_num }}' != '':
+                      netnum = int('${{ env.netif_num }}')
+                  if len(dat) == 2:
+                      for index in range(netnum):
+                          config["extra_cmdline"]["mac{}".format(index+1)] = hex(int(dat[0].strip().replace(':', ''), 16) + index)[2:].rjust(12,'0').upper()
+                      config["extra_cmdline"]["netif_num"] = netnum
+
+              if '${{ env.diskidxmap }}' != '':
+                  config["extra_cmdline"]["DiskIdxMap"] = '${{ env.diskidxmap }}'
+              if '${{ env.sataportmap }}' != '':
+                  config["extra_cmdline"]["SataPortMap"] = '${{ env.sataportmap }}'
+              if '${{ env.sasidxmap }}' != '':
+                  config["extra_cmdline"]["SasIdxMap"] = '${{ env.sasidxmap }}'
 
 
-                if not "synoinfo" in config:
-                    config["synoinfo"] = {}
+              if not "synoinfo" in config:
+                  config["synoinfo"] = {}
 
-                if '${{ steps.info.outputs.maxdisks }}' != '':
-                    config["synoinfo"]["maxdisks"] = '${{ steps.info.outputs.maxdisks }}'
-                if '${{ steps.info.outputs.maxlanport }}' != '':
-                    config["synoinfo"]["maxlanport"] = '${{ steps.info.outputs.maxlanport }}'
-                if '${{ steps.info.outputs.internalportcfg }}' != '':
-                    config["synoinfo"]["internalportcfg"] = '${{ steps.info.outputs.internalportcfg }}'
-                if '${{ steps.info.outputs.esataportcfg }}' != '':
-                    config["synoinfo"]["esataportcfg"] = '${{ steps.info.outputs.esataportcfg }}'
-                if '${{ steps.info.outputs.usbportcfg }}' != '':
-                    config["synoinfo"]["usbportcfg"] = '${{ steps.info.outputs.usbportcfg }}'
+              if '${{ env.maxdisks }}' != '':
+                  config["synoinfo"]["maxdisks"] = '${{ env.maxdisks }}'
+              if '${{ env.maxlanport }}' != '':
+                  config["synoinfo"]["maxlanport"] = '${{ env.maxlanport }}'
+              if '${{ env.internalportcfg }}' != '':
+                  config["synoinfo"]["internalportcfg"] = '${{ env.internalportcfg }}'
+              if '${{ env.esataportcfg }}' != '':
+                  config["synoinfo"]["esataportcfg"] = '${{ env.esataportcfg }}'
+              if '${{ env.usbportcfg }}' != '':
+                  config["synoinfo"]["usbportcfg"] = '${{ env.usbportcfg }}'
 
-                print(json.dumps(config, indent=4))
+              print(json.dumps(config, indent=4))
 
-                with open('user_config.json', 'w', encoding="utf-8") as f:
-                    f.write(json.dumps(config, indent=4))
+              with open('user_config.json', 'w', encoding="utf-8") as f:
+                  f.write(json.dumps(config, indent=4))
                   
       - name: Run Build
-        if: steps.info.outputs.iscustom == 'true' && success()
+        if: env.iscustom == 'true' && success()
         run: |
           function exdsmpat() {
+            platform=$1
+            version=$2
+
+            synoplatform=$(echo ${platform,,} | sed 's/+/p/g')                             # DS3622xs+ => ds3622xsp
+            synoversion=$(echo ${version} | awk -F - '{print $2}')                         # 7.0.1-42218 => 42218
+            
+            configfile=./config/${platform}/${version}/config.json
+            paturl=$(cat ${configfile} | jq '.os .pat_url' | sed -s 's/"//g')
+
             pwd
             cd ./cache
-            path=7.0.1/42218
-            if [ "$2" == "42661" ]; then
-              path=7.1/42661-1
-            fi
-            if [ "$2" == "42962" ]; then
-              path=7.1.1/42962
-            fi
-            curl -L https://global.download.synology.com/download/DSM/release/${path}/DSM_$1_$2.pat -o ds.pat
-            if [ "$1" == "DVA1622" ]; then
+            curl -L ${paturl} -o ds.pat
+            # if [ "${platform}" == "DVA1622" -o "${platform}" == "DS923+" ]; then
               curl -L https://global.download.synology.com/download/DSM/release/7.0.1/42218/DSM_DS3622xs%2B_42218.pat -o oldpat.tar.gz
-            else
-              curl -L https://global.download.synology.com/download/DSM/release/7.0.1/42218/DSM_$1_42218.pat -o oldpat.tar.gz
-            fi
+            # else
+            #   curl -L https://global.download.synology.com/download/DSM/release/7.0.1/42218/DSM_${platform/+/%2B}_42218.pat -o oldpat.tar.gz
+            # fi
             mkdir synoesp && tar -C./synoesp/ -xf oldpat.tar.gz rd.gz
             cd synoesp
             xz -dc < rd.gz >rd 2>/dev/null || echo "extract rd.gz"
@@ -705,17 +765,21 @@ jobs:
             cd ..
             mkdir pat
             sudo LD_LIBRARY_PATH=synoesp/extract synoesp/extract/syno_extract_system_patch ds.pat pat || echo "extract latest pat"
-            tar -czvf $3 -C ./pat/ . --warning=no-file-changed
+            tar -czvf ${synoplatform}_${synoversion}.pat -C ./pat/ . --warning=no-file-changed
             ls -al
             sha256zImage=$(sha256sum ./pat/zImage | awk '{print $1}')
             sha256ramdisk=$(sha256sum ./pat/rd.gz | awk '{print $1}')
             echo sha256zImage: ${sha256zImage} sha256ramdisk: ${sha256ramdisk}
             sudo rm -rf ds.pat oldpat.tar.gz synoesp pat
             ls -al
-            sha256newpat=$(sha256sum $3 | awk '{print $1}')
+            sha256newpat=$(sha256sum ${synoplatform}_${synoversion}.pat | awk '{print $1}')
             echo sha256newpat: ${sha256newpat}
             cd ..
             pwd
+
+            jq -r .os.sha256 ${configfile}
+            sed -i "s/$(jq -r .os.sha256 ${configfile})/${sha256newpat}/g" ${configfile}
+            jq -r .os.sha256 ${configfile}
           }
 
           function setsynoarch() {
@@ -725,6 +789,9 @@ jobs:
                 ;;
             DS920+)
                 synoarch=geminilake
+                ;;
+            DS923+)
+                synoarch=r1000
                 ;;
             DS1520+)
                 synoarch=geminilake
@@ -772,20 +839,24 @@ jobs:
 
           # 开始表演
           echo "============================编译开始============================"
-          repo=${{ steps.info.outputs.exp }}
-          branch=develop
+          repository=${{ env.repository }}
+          repo=$(echo ${repository} | awk -F'_' '{print $1}')
+          branch=$(echo ${repository} | awk -F'_' '{print $2}')
+          lkm=${{ env.lkm }}
+
           bArgs=''
-          if [ ${{ steps.info.outputs.jun }} == '1' ]; then 
+          if [ ${repository} != 'pocopico_develop' ]; then 
             bArgs='BRP_JUN_MOD=1 BRP_DEBUG=1'
-            if [ ${repo} == 'pocopico' ]; then 
-              branch=jun
-            fi
           fi
+
+          lkmext=https://raw.githubusercontent.com/wjz304/rp-ext/master
           rpext=https://raw.githubusercontent.com/pocopico/rp-ext/master
           loadext=https://raw.githubusercontent.com/${repo}/redpill-load/${branch}
-          if [ ${{ steps.info.outputs.dev }} == '1' ]; then 
+          if [ ${{ env.dev }} == '1' ]; then 
             rpext=https://raw.githubusercontent.com/wjz304/rp-ext/master
-            loadext=https://raw.githubusercontent.com/wjz304/rp-ext/master
+            if [ ${repo} == 'pocopico' ]; then 
+              loadext=https://raw.githubusercontent.com/wjz304/rp-ext/master
+            fi
           fi
 
           git clone -b ${branch} https://github.com/${repo}/redpill-load redpill-load
@@ -794,68 +865,16 @@ jobs:
           if [ ${repo} == 'pocopico' -a ${branch} == 'develop' ]; then 
             # cd redpill-load && git reset --hard d810a64a33fdc84287ab68e2d5919763c725ebeb && cd ..
 
-            cp -r redpill-load/config/DS920+ redpill-load/config/DS1520+
-            #find redpill-load/config/DS1520+ -type d -name '*920*' -execdir rename 's/920p/1520p/' '{}' +
-            find redpill-load/config/DS1520+ -type f -name '*920*' -exec rename 's/920p/1520p/' '{}' +
-            sed -i 's/DS920+/DS1520+/g; s/DS920%2B/DS1520%2B/g; s/920p/1520p/g' `find redpill-load/config/DS1520+ -type f -name '*config.json'`
-            sed -i 's/fe2a4648f76adeb65c3230632503ea36bbac64ee88b459eb9bfb5f3b8c8cebb3/06947c58f25bd591f7fa3c58ad9473777481bdd7a049b42d1cb585ca01b053ee/g' redpill-load/config/DS1520+/7.0.1-42218/config.json
-            sed -i 's/346b68f662b50f47d3ee6c2bc9de6302e4b60436142c24ee88b620c7afd1ba06/74d513aaa3e30d8aa4f80e202d94a68a552e9c0472f8470e133ad29080556f55/g' redpill-load/config/DS1520+/7.0.1-42218/config.json
-            sed -i 's/f7dd1317f24ec6b9bac839e37f66b59030218c7f97c06f73f1f54ed0f892c4aa/f0a275587c51acdb4d58a7f0d82d70f31e54228d0fbf7575d5d425dae75d1969/g' redpill-load/config/DS1520+/7.0.1-42218/config.json
-            sed -i 's/c8ad44826c87e065a3b05f354a639c0a86cb2fa47b88e11949604d53f3e80048/b18f14b8420a217d7b6dd3696786ecccfbe7c325d342475531a68a7df831cffc/g' redpill-load/config/DS1520+/7.1.0-42661/config.json
-            sed -i 's/42053cbfbce34d43c50db2d68786360f644fc88af3e9bbaa6377ffa9953bf158/aad75938d165ef5efdbfc4c570c4cd1cc252344d0756dd3d89a44f581aa6be6f/g' redpill-load/config/DS1520+/7.1.1-42962/config.json
-            
-            cp -r redpill-load/config/DS1621+ redpill-load/config/DS1821+
-            #find redpill-load/config/DS1821+ -type d -name '*1621*' -execdir rename 's/1621p/1821p/' '{}' +
-            find redpill-load/config/DS1821+ -type f -name '*1621*' -exec rename 's/1621p/1821p/' '{}' +
-            sed -i 's/DS1621+/DS1821+/g; s/DS1621%2B/DS1821%2B/g; s/1621p/1821p/g' `find redpill-load/config/DS1821+ -type f -name '*config.json'`
-            sed -i 's/19f56827ba8bf0397d42cd1d6f83c447f092c2c1bbb70d8a2ad3fbd427e866df/9a8e2faefac25b5e4dc62eb02b43cb95ee3a44d14e228fef7122ae81b0ca699c/g' redpill-load/config/DS1821+/7.0.1-42218/config.json
-            sed -i 's/f4648d0dd6b29ef6149b0ff46afe1fe32f81730aa79af72f37ffd3647c76f586/f4648d0dd6b29ef6149b0ff46afe1fe32f81730aa79af72f37ffd3647c76f586/g' redpill-load/config/DS1821+/7.0.1-42218/config.json
-            sed -i 's/73512c7bceb34cf7f7f93c2703db60496da0e27274fc45e5aefa0366c9734d6e/10ecb6b63cd4d628a34c29acafcbe6cd7180c72087af39239482f48f578c2620/g' redpill-load/config/DS1821+/7.0.1-42218/config.json
-            sed -i 's/8fd5eb40fb088af97d3beee85b6275c2ceb368b08453eb5a5d00d42cc7d578d1/0f0fcca91e23d575984a4783781f4ceab3df469e2a28c830be292dad97773cb2/g' redpill-load/config/DS1821+/7.1.0-42661/config.json
-            sed -i 's/7a900e3017b4ee09b792d2ed291b7229476ae3e583fe559bbd9baaa812705aa0/faa86b13eab055eacdb85e3fa74d674fd956439d8b6027c75647d9d1873f8f12/g' redpill-load/config/DS1821+/7.1.1-42962/config.json
-            
-            cp -r redpill-load/config/DS1621+ redpill-load/config/FS2500
-            #find redpill-load/config/FS2500 -type d -name '*1621*' -execdir rename 's/1621p/fs2500/' '{}' +
-            find redpill-load/config/FS2500 -type f -name '*1621*' -exec rename 's/1621p/fs2500/' '{}' +
-            sed -i 's/DS1621+/FS2500/g; s/DS1621%2B/FS2500/g; s/ds1621p/fs2500/g; s/1621p/fs2500/g' `find redpill-load/config/FS2500 -type f -name '*config.json'`
-            sed -i 's/19f56827ba8bf0397d42cd1d6f83c447f092c2c1bbb70d8a2ad3fbd427e866df/4d060be8afec548fdb042bc8095524f10ff200033cab74df37ae07f3de5eaa69/g' redpill-load/config/FS2500/7.0.1-42218/config.json
-            sed -i 's/73512c7bceb34cf7f7f93c2703db60496da0e27274fc45e5aefa0366c9734d6e/cbe9099c57f23ba53415574b011580218fa55a0bdb83c4e4bba9e27100e5379d/g' redpill-load/config/FS2500/7.0.1-42218/config.json
-            sed -i 's/f4648d0dd6b29ef6149b0ff46afe1fe32f81730aa79af72f37ffd3647c76f586/f6816165a52b1f53ce44a45878fe06641da34e9478947f826a236c1a6548f8fd/g' redpill-load/config/FS2500/7.0.1-42218/config.json
-            sed -i 's/8fd5eb40fb088af97d3beee85b6275c2ceb368b08453eb5a5d00d42cc7d578d1/698e9b1d719d3032a9a2b91ca08078c632b3265590147b2f6c9ca200c826e987/g' redpill-load/config/FS2500/7.1.0-42661/config.json
-            sed -i 's/7a900e3017b4ee09b792d2ed291b7229476ae3e583fe559bbd9baaa812705aa0/9efc0351212d36e5a51542bff9b2f173beb913c5be3eaaeec1e78625d62763cb/g' redpill-load/config/FS2500/7.1.1-42962/config.json
-
             #find redpill-load/config/DS3622xs+ -type d -name '*3622xs*' -execdir rename 's/3622xs\+/3622xsp/' '{}' +
             find redpill-load/config/DS3622xs+ -type f -name '*3622xs*' -exec rename 's/-3622xs\+/-3622xsp/' '{}' +
             sed -i 's/DS3622xs /DS3622xs+ /g; s/-3622xs+/-3622xsp/g' `find redpill-load/config/DS3622xs+ -type f -name '*config.json'`
-
-            rm -r redpill-load/config/RS4021xs+
-            cp -r redpill-load/config/DS3622xs+ redpill-load/config/RS4021xs+
-            #find redpill-load/config/RS4021xs+ -type d -name '*3622xs*' -execdir rename 's/3622xsp/4021xsp/' '{}' +
-            find redpill-load/config/RS4021xs+ -type f -name '*3622xs*' -exec rename 's/3622xsp/4021xsp/' '{}' +
-            sed -i 's/DS3622xs+/RS4021xs+/g; s/DS3622xs%2B/RS4021xs%2B/g; s/ds3622xsp/rs4021xsp/g; s/3622xsp/4021xsp/g' `find redpill-load/config/RS4021xs+ -type f -name '*config.json'`
-            sed -i 's/f38329b8cdc5824a8f01fb1e377d3b1b6bd23da365142a01e2158beff5b8a424/7afca3970ac7324d7431c1484d4249939bedd4c18ac34187f894c43119edf3a1/g' redpill-load/config/RS4021xs+/7.0.1-42218/config.json
-            sed -i 's/a95d4ab06189460f3b3d13a33e421887b5f3ea09a10535ae0d4c92beb7ff631d/3510afe5b3dfe3662bfe054c1728c8794911da431718b533cd03d2a2c061ffd5/g' redpill-load/config/RS4021xs+/7.0.1-42218/config.json
-            sed -i 's/06964b68e5ccdedd4363dff3986f99686d3c9cb5225e8e4c3d840a1d9cd1330b/b4cc62e9953f226960de98b65887e17dd6df5fa0ad28f665e0b4660dbd5f2fa8/g' redpill-load/config/RS4021xs+/7.0.1-42218/config.json
-            sed -i 's/df8a055d6bc901229f0ba53ed5b4fe024bdf9a1b42f0c32483adefcdac14db4d/143e475fe73c0adb3377361402b4baad21448476e844e55e16d1ed51ffc4c971/g' redpill-load/config/RS4021xs+/7.1.0-42661/config.json
-            sed -i 's/432f315818adad4e1ca54040557e164caf2937004e2d009aac8865391353e2f6/40775a6b9b4fae2887cd07c0efdfb26e738e2b8de73602657f7bc4407ae4a688/g' redpill-load/config/RS4021xs+/7.1.1-42962/config.json
-
-            cp -r redpill-load/config/DS3622xs+ redpill-load/config/FS3600
-            #find redpill-load/config/FS3600 -type d -name '*3622xs*' -execdir rename 's/3622xsp/fs3600/' '{}' +
-            find redpill-load/config/FS3600 -type f -name '*3622xs*' -exec rename 's/3622xsp/fs3600/' '{}' +
-            sed -i 's/DS3622xs+/FS3600/g; s/DS3622xs%2B/FS3600/g; s/ds3622xsp/fs3600/g; s/3622xsp/fs3600/g' `find redpill-load/config/FS3600 -type f -name '*config.json'`
-            sed -i 's/f38329b8cdc5824a8f01fb1e377d3b1b6bd23da365142a01e2158beff5b8a424/a6ff25bc45a05eb880a0872c5408a5a744b16834385eab8df28ce25cf76ef12e/g' redpill-load/config/FS3600/7.0.1-42218/config.json
-            sed -i 's/a95d4ab06189460f3b3d13a33e421887b5f3ea09a10535ae0d4c92beb7ff631d/8f0830256f78ddd2d3ae90f14cbf6bab3048e3ffa05e2241a3d4561db7020aed/g' redpill-load/config/FS3600/7.0.1-42218/config.json
-            sed -i 's/06964b68e5ccdedd4363dff3986f99686d3c9cb5225e8e4c3d840a1d9cd1330b/17607e1739c8acc9903272ebd981bccb27b51057cdcb3cc446e5c5149db452d3/g' redpill-load/config/FS3600/7.0.1-42218/config.json
-            sed -i 's/df8a055d6bc901229f0ba53ed5b4fe024bdf9a1b42f0c32483adefcdac14db4d/228884172ce53110f664066248c9b83597431aedebfb5384a081181833fbccd1/g' redpill-load/config/FS3600/7.1.0-42661/config.json
-            sed -i 's/432f315818adad4e1ca54040557e164caf2937004e2d009aac8865391353e2f6/701b96f5d0848fa34a13b5112086ed80641afe764f420ae43a09bf5a4f1d736a/g' redpill-load/config/FS3600/7.1.1-42962/config.json
-
           fi
 
           cp user_config.json redpill-load/user_config.json
 
           cd redpill-load
-          platform=${{ steps.info.outputs.platform }}
-          version=${{ steps.info.outputs.version }}
+          platform=${{ env.platform }}
+          version=${{ env.version }}
           synoplatform=$(echo ${platform,,} | sed 's/+/p/g')                             # DS3622xs+ => ds3622xsp
           synoversion=$(echo ${version} | awk -F - '{print $2}')                         # 7.0.1-42218 => 42218
           setsynoarch ${platform}
@@ -863,26 +882,21 @@ jobs:
           # 7.1 解密PAT
           echo "===========================7.1 解密PAT=========================="
           if [[ "${version}" > "7.0.1-42218" ]]; then 
-            newpat=${synoplatform}_${synoversion}.pat
-            exdsmpat ${platform/+/%2B} ${synoversion} ${newpat}
-            ls -al ./cache
-            configfile=./config/${platform}/${version}/config.json
-            jq -r .os.sha256 ${configfile}
-            sed -i "s/$(jq -r .os.sha256 ${configfile})/$(sha256sum ./cache/${newpat} | awk '{print $1}')/g" ${configfile}
-            jq -r .os.sha256 ${configfile}
+            exdsmpat ${platform} ${version}
           fi
 
           # 添加必备驱动
           echo "===========================添加必备驱动=========================="
           echo -e '{\n    "thethorgroup.boot-wait": "https://raw.githubusercontent.com/wjz304/rp-ext/master/redpill-boot-wait/rpext-index.json"\n}' > bundled-exts.json
-          [ "$(curl -s --location ${loadext}/redpill-boot-wait/rpext-index.json | jq -r .releases.${synoplatform}_${synoversion})" != "null" ] && ./ext-manager.sh add ${loadext}/redpill-boot-wait/rpext-index.json
-          [ "$(curl -s --location ${loadext}/redpill-acpid/rpext-index.json | jq -r .releases.${synoplatform}_${synoversion})" != "null" ] && ./ext-manager.sh add ${loadext}/redpill-acpid/rpext-index.json
-          [ "$(curl -s --location ${loadext}/redpill-misc/rpext-index.json | jq -r .releases.${synoplatform}_${synoversion})" != "null" ] && ./ext-manager.sh add ${loadext}/redpill-misc/rpext-index.json
-          [ "$(curl -s --location ${loadext}/redpill-virtio/rpext-index.json | jq -r .releases.${synoplatform}_${synoversion})" != "null" ] && ./ext-manager.sh add ${loadext}/redpill-virtio/rpext-index.json
+
+          [ -f ./redpill-boot-wait/rpext-index.json -a "$(curl -s --location ${loadext}/redpill-boot-wait/rpext-index.json | jq -r .releases.${synoplatform}_${synoversion})" != "null" ] && ./ext-manager.sh add ${loadext}/redpill-boot-wait/rpext-index.json
+          [ -f ./redpill-acpid/rpext-index.json -a "$(curl -s --location ${loadext}/redpill-acpid/rpext-index.json | jq -r .releases.${synoplatform}_${synoversion})" != "null" ] && ./ext-manager.sh add ${loadext}/redpill-acpid/rpext-index.json
+          [ -f ./redpill-misc/rpext-index.json -a "$(curl -s --location ${loadext}/redpill-misc/rpext-index.json | jq -r .releases.${synoplatform}_${synoversion})" != "null" ] && ./ext-manager.sh add ${loadext}/redpill-misc/rpext-index.json
+          [ -f ./redpill-virtio/rpext-index.json -a "$(curl -s --location ${loadext}/redpill-virtio/rpext-index.json | jq -r .releases.${synoplatform}_${synoversion})" != "null" ] && ./ext-manager.sh add ${loadext}/redpill-virtio/rpext-index.json
 
           # redpill.ko 方式一 
           echo "=======================Download redpill.ko======================"
-          extension=$(curl -s --location "${rpext}/redpill/rpext-index.json")
+          extension=$(curl -s --location "${lkmext}/${lkm}/rpext-index.json")
           redpilltgz=$(curl -s --location "$(echo ${extension} | jq -r .releases.${synoplatform}_${synoversion})" | jq -r '.files[] .url')
           [ "$(echo $redpilltgz | awk '{print $NF}')" != "$redpilltgz" ] && redpilltgz=$(echo $redpilltgz | awk '{print $1}')
           wget ${redpilltgz}
@@ -902,16 +916,24 @@ jobs:
           # cp -fv ./redpill.ko ../ext/rp-lkm/redpill-linux-v$(modinfo --field=vermagic ./redpill.ko | awk '{print $1}').ko
           # cd ..
 
-          dtbs=(DS920+ DS1520+ DS1621+ DS1821+ DS2422+ DVA1622 FS2500)
+          dtbs=(DS920+ DS923+ DS1520+ DS1621+ DS1821+ DS2422+ DVA1622 FS2500)
           for item in ${dtbs[@]}
           do
             if [ "${item}" == "${platform}" ]; then
-              echo "============================Add .dtb============================"
-              ./ext-manager.sh add https://raw.githubusercontent.com/wjz304/rp-ext/master/redpill-dtb-static/rpext-index.json
-              ./ext-manager.sh _update_platform_exts ${synoplatform}_${synoversion} redpill-dtb-static
-
-              if [ -n "${{ steps.info.outputs.dtb }}" ]; then
-                dtbuserfile="${{ steps.info.outputs.dtb }}"
+              if [ -z "${{ env.dtb }}" ]; then
+                echo "========================Add redpill-dtb========================="
+                ./ext-manager.sh add ${lkmext}/redpill-dtb/rpext-index.json
+                ./ext-manager.sh _update_platform_exts ${synoplatform}_${synoversion} pocopico.dtb
+              # 仅本地可用 
+              # elif [ "${{ env.dtb }}" == "auto" ]; then
+              #   echo "==========================Add dtbpatch=========================="
+              #   ./ext-manager.sh add ${lkmext}/dtbpatch/rpext-index.json
+              #   ./ext-manager.sh _update_platform_exts ${synoplatform}_${synoversion} dtbpatch
+              else
+                echo "=====================Add redpill-dtb-static====================="
+                ./ext-manager.sh add ${lkmext}/redpill-dtb-static/rpext-index.json
+                ./ext-manager.sh _update_platform_exts ${synoplatform}_${synoversion} redpill-dtb-static
+                dtbuserfile="${{ env.dtb }}"
                 dtbextfile="$(find custom -name model_${synoplatform}.dtb)"
                 echo Copying ${dtbuserfile} to ${dtbextfile} ...
                 sudo cp ${dtbuserfile} ${dtbextfile}
@@ -921,8 +943,8 @@ jobs:
 
           # 添加扩展驱动
           echo "==========================添加扩展驱动==========================="
-          if [ -n "${{ steps.info.outputs.ext }}" ]; then
-            ext=${{ steps.info.outputs.ext }}
+          if [ -n "${{ env.ext }}" ]; then
+            ext=${{ env.ext }}
             exts=(${ext//,/ })
             for item in ${exts[@]}
             do
@@ -967,25 +989,25 @@ jobs:
           ls -al ./custom/extensions
 
       - name: Generate release tag
-        if: steps.info.outputs.iscustom == 'true' && success()
+        if: env.iscustom == 'true' && success()
         id: tag
         run: |
-          echo "::set-output name=release_tag::$(date +"%Y.%m.%d-%H%M")"
+          echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_ENV
 
-          if [ ${{ steps.info.outputs.issues }} == 'true' ]; then
+          if [ ${{ env.issues }} == 'true' ]; then
             echo "### ${{ env.issueauth }}'s Redpill Custom" >> $GITHUB_STEP_SUMMARY
             echo "👉 issues: [#${{ env.issuenumber }}](${{ github.event.issue.html_url }})" >> $GITHUB_STEP_SUMMARY
           else
             echo "### ${{ github.triggering_actor }}'s Redpill Custom" >> $GITHUB_STEP_SUMMARY
-            echo "👉 "platform": "${{ steps.info.outputs.platform }}"  " >> $GITHUB_STEP_SUMMARY
-            echo "👉 "version": "${{ steps.info.outputs.version }}", "jun": "${{ steps.info.outputs.jun }}"  " >> $GITHUB_STEP_SUMMARY
-            echo "👉 "ext": "${{ steps.info.outputs.ext }}"  " >> $GITHUB_STEP_SUMMARY
+            echo "👉 "platform": "${{ env.platform }}"  " >> $GITHUB_STEP_SUMMARY
+            echo "👉 "version": "${{ env.version }}"  " >> $GITHUB_STEP_SUMMARY
+            echo "👉 "ext": "${{ env.ext }}"  " >> $GITHUB_STEP_SUMMARY
           fi
 
-          if [ '${{ steps.info.outputs.warinfo }}' != '' ]; then
+          if [ '${{ env.warinfo }}' != '' ]; then
             echo "  " >> $GITHUB_STEP_SUMMARY
             echo "‼️‼️‼️  " >> $GITHUB_STEP_SUMMARY
-            echo 'Body 中含有自定义的 ${{ steps.info.outputs.warinfo }} 敏感信息, 为防止其他人盗用, 建议附件下载完成后删除日志和附件.  ' >> $GITHUB_STEP_SUMMARY
+            echo 'Body 中含有自定义的 ${{ env.warinfo }} 敏感信息, 为防止其他人盗用, 建议附件下载完成后删除日志和附件.  ' >> $GITHUB_STEP_SUMMARY
             echo '在👉Issues下评论 "delete builds" 即可删该Issues的所有历史编译记录.  ' >> $GITHUB_STEP_SUMMARY
           fi
 
@@ -995,31 +1017,17 @@ jobs:
           else
             echo -e "BOOT:\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> redpill-load/body#actions.txt
           fi
-          function getpaturl() {
-            case $1 in
-            6.2.4-25556)
-                paturl=https://global.download.synology.com/download/DSM/release/6.2.4/25556/DSM_$2_25556.pat
-                ;;
-            7.0.1-42218)
-                paturl=https://global.download.synology.com/download/DSM/release/7.0.1/42218/DSM_$2_42218.pat
-                ;;
-            7.1.0-42661)
-                paturl=https://global.download.synology.com/download/DSM/release/7.1/42661-1/DSM_$2_42661.pat
-                ;;
-            7.1.1-42962)
-                paturl=https://global.download.synology.com/download/DSM/release/7.1.1/42962/DSM_$2_42962.pat
-                ;;
-            esac
-          }
-          getpaturl ${{ steps.info.outputs.version }} ${{ steps.info.outputs.platform }}
-          paturl=${paturl/+/%2B}
+
+          configfile=./redpill-load/config/${{ env.platform }}/${{ env.version }}/config.json
+          paturl=$(cat ${configfile} | jq '.os .pat_url' | sed -s 's/"//g')
+
           echo -e "\nPAT:\n${paturl}" >> redpill-load/body#${{ env.issuenumber }}.txt
 
       - name: Upload to Artifacts
-        if: steps.info.outputs.iscustom == 'true' && success()
+        if: env.iscustom == 'true' && success()
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.event.repository.name }}-Custom-${{ steps.tag.outputs.release_tag }}
+          name: ${{ github.event.repository.name }}-Custom-${{ env.release_tag }}
           path: |
             redpill-load/exts.txt
             redpill-load/body*.txt
@@ -1027,9 +1035,9 @@ jobs:
             redpill-load/images/*.img
 
       - name: Generate release tag
-        if: steps.info.outputs.iscustom == 'false'
+        if: env.iscustom == 'false'
         run: |
-          if [ ${{ steps.info.outputs.issues }} == 'true' ]; then
+          if [ ${{ env.issues }} == 'true' ]; then
             echo "### ${{ env.issueauth }}'s Redpill Custom" >> $GITHUB_STEP_SUMMARY
           else
             echo "### ${{ github.triggering_actor }}'s Redpill Custom" >> $GITHUB_STEP_SUMMARY
@@ -1037,22 +1045,23 @@ jobs:
           echo "😞 😔 😟 😕 🙁 ☹️ 😣 😖 😫 😩 🥺 😢  " >> $GITHUB_STEP_SUMMARY
           echo "您自定义 Redpill 所填写的信息有误, 无法触发编译, 请参考模板和错误提示对body进行修改并请重新触发编译(Close & Reopen).  " >> $GITHUB_STEP_SUMMARY
           echo "`Error Info:`  " >> $GITHUB_STEP_SUMMARY
-          echo "`${{ steps.info.outputs.errinfo }}`  " >> $GITHUB_STEP_SUMMARY
-          if [ '${{ steps.info.outputs.warinfo }}' != '' ]; then
+          echo "`${{ env.errinfo }}`  " >> $GITHUB_STEP_SUMMARY
+          if [ '${{ env.warinfo }}' != '' ]; then
             echo "  " >> $GITHUB_STEP_SUMMARY
             echo "‼️‼️‼️  " >> $GITHUB_STEP_SUMMARY
-            echo 'Body 中含有自定义的 ${{ steps.info.outputs.warinfo }} 敏感信息, 为防止其他人盗用, 建议确认错误原因后删除日志和附件.  ' >> $GITHUB_STEP_SUMMARY
+            echo 'Body 中含有自定义的 ${{ env.warinfo }} 敏感信息, 为防止其他人盗用, 建议确认错误原因后删除日志和附件.  ' >> $GITHUB_STEP_SUMMARY
             echo '在👉Issues下评论 "delete builds" 即可删👉Issues的所有历史编译记录.  ' >> $GITHUB_STEP_SUMMARY
           fi
 
 
-      - name: Create Issues Comment
-        if: steps.info.outputs.issues == 'true' && steps.info.outputs.iscustom == 'true' && success()
+      - name: Update Comment Finish
+        if: env.issues == 'true' && env.iscustom == 'true' && success()
         uses: actions-cool/issues-helper@v3
         with:
-          actions: 'create-comment'
+          actions: 'update-comment'
           token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: ${{ env.issuenumber }}
+          comment-id: ${{ steps.comment.outputs.comment-id }}
+          update-mode: replace
           body: |
             ${{ env.issueauth }} 您好.
             您自定义的 Redpill 已构建完成. 请前往下面的 URL 下载.  
@@ -1066,20 +1075,21 @@ jobs:
           emoji: hooray
 
       - name: Close Issues
-        if: steps.info.outputs.issues == 'true' && steps.info.outputs.iscustom == 'true' && success()
+        if: env.issues == 'true' && env.iscustom == 'true' && success()
         uses: actions-cool/issues-helper@v3
         with:
           actions: 'close-issue'
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ env.issuenumber }}
 
-      - name: Create Issues Comment
-        if: steps.info.outputs.issues == 'true' && steps.info.outputs.iscustom == 'true' && failure()
+      - name: Update Comment Fail
+        if: env.issues == 'true' && env.iscustom == 'true' && failure()
         uses: actions-cool/issues-helper@v3
         with:
-          actions: 'create-comment'
+          actions: 'update-comment'
           token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: ${{ env.issuenumber }}
+          comment-id: ${{ steps.comment.outputs.comment-id }}
+          update-mode: replace
           body: |
             ${{ env.issueauth }} 您好.
             您自定义的 Redpill 构建失败. 请前往下面的 URL 查看详细信息对body进行修改并请重新触发编译(Close & Reopen).  
@@ -1091,15 +1101,20 @@ jobs:
             ----  
           emoji: confused
 
-      - name: Warning Download comment
-        if: steps.info.outputs.issues == 'true' && steps.info.outputs.warinfo != ''
+      - name: Update Comment Warinfo
+        if: env.issues == 'true' && env.warinfo != ''
         uses: actions-cool/issues-helper@v3
         with:
-          actions: 'create-comment'
+          actions: 'update-comment'
           token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: ${{ env.issuenumber }}
+          comment-id: ${{ steps.comment.outputs.comment-id }}
+          update-mode: append
           body: |
+            >
+            ----
             ‼️‼️‼️  
-            `Body 中含有自定义的 ${{ steps.info.outputs.warinfo }} 敏感信息, 为防止其他人盗用, 建议附件下载完成/确认错误原因后删除日志和附件.`
+            `Body 中含有自定义的 ${{ env.warinfo }} 敏感信息, 为防止其他人盗用, 建议附件下载完成/确认错误原因后删除日志和附件.`
             `在Issues下评论 "delete builds" 即可删Issues的所有历史编译记录.`  
+            >
+            ----
           emoji: eyes

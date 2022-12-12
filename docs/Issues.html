@@ -58,11 +58,16 @@
       var dev = "0";
       var cdn = "";
 
+      var _loads = {};
+      var _exts = {};
+      var _lkms = {};
+
       repo = getRepo(repo);
       dev = getUrlParam("dev");
       cdn = `https://raw.githubusercontent.com/${repo}/main/`;
-      cdn = `https://fastly.jsdelivr.net/gh/${repo}@main/`;
-      //cdn = `https://gcore.jsdelivr.net/gh/${repo}@main/`;
+      //cdn = `https://fastly.jsdelivr.net/gh/${repo}@main/`;
+      cdn = `https://gcore.jsdelivr.net/gh/${repo}@main/`;
+      //cdn = `https://cdn.statically.io/gh/${repo}/main/`;
       //cdn = `https://cdn.staticaly.com/gh/${repo}/main/`;
 
       function getRepo(repo) {
@@ -70,8 +75,12 @@
         var arr = url.split("?")[0].split("/");
         if (arr.length > 1) {
           for (var i = 0; i < arr.length; i++) {
-            if ((arr[i].indexOf(".github.io") >= 0) && (i+1 < arr.length) && (arr[i+1].length > 0)) {
-              return arr[i].replace(".github.io","") + "/" + arr[i+1];
+            if (
+              arr[i].indexOf(".github.io") >= 0 &&
+              i + 1 < arr.length &&
+              arr[i + 1].length > 0
+            ) {
+              return arr[i].replace(".github.io", "") + "/" + arr[i + 1];
             }
           }
         }
@@ -107,11 +116,9 @@
       window.onload = function () {
         setLogo(dev);
         setTitle();
-        //setTips();
+        setTips();
         $("#titleLabel").on("click", changemode);
-        httpGetAsync(
-          cdn + "parameter.json" + "?+Math.random()",
-          function (result) {
+        httpGetAsync(cdn + "parameter.json" + "?" + Math.random(), function (result) {
             result = JSON.parse(result);
             $("#inputs").find("div").remove(); //html('');
             var html = "";
@@ -121,8 +128,20 @@
             }
             $("#inputs").prepend(html);
 
+            $("#repository").on("change", changeRepository);
             $("#platform").on("change", changePlatform);
-            changePlatform();
+            $("#version").on("change", changeVersion);
+
+            httpGetAsync(cdn + "loads.json" + "?" + Math.random(), function (result) {
+              _loads = JSON.parse(result);
+              httpGetAsync(cdn + "exts.json" + "?" + Math.random(), function (result) {
+                _exts = JSON.parse(result);
+                httpGetAsync(cdn + "lkms.json" + "?" + Math.random(), function (result) {
+                  _lkms = JSON.parse(result);
+                  changeRepository();
+                });
+              });
+            });
           }
         );
       };
@@ -142,30 +161,13 @@
       function setTitle() {
         document.title = repo;
         $("#titleA")[0].href = `https://github.com/${repo}`;
-        $("#titleA")[0].innerText = repo.substring(repo.indexOf("/")+1);
+        $("#titleA")[0].innerText = repo.substring(repo.indexOf("/") + 1);
       }
 
       function setTips() {
-        httpGetAsync(cdn + "tips.md" + "?+Math.random()", function (result) {
-          // var html = marked.parse(result).replace('<pre>', "<pre>\n");
-          // 引入的文件就是一段md格式的代码，这里就直接解析一下算了
-          var html = result.replace(/\`+[^\n]*\n/g, "");
-          html = html.split("\n");
-          // html = html.splice(1, html.length-2);
-          var css = "";
-          for (var i in html) {
-            css = "";
-            if (html[i].substr(0, 1) == "-") {
-              css = "pl-md";
-            } else {
-              css = "pl-mi1";
-            }
-            if (css) {
-              html[i] = '<span class="' + css + '">' + html[i] + "</span>";
-            }
-          }
-          html = "<pre>" + html.join("\n") + "</pre>";
-          $(".highlight.highlight-source-diff").html(html);
+        httpGetAsync(cdn + "tips.md" + "?" + Math.random(), function (result) {
+          var html = result.replace(/\n/g, "<br />");
+          $("#content").html(html);
         });
       }
 
@@ -218,69 +220,91 @@
         return html;
       }
 
-      function changePlatform() {
-        httpGetAsync(cdn + "loads.json" + "?+Math.random()", function (result) {
-          result = JSON.parse(result);
-          var xreleases = result["pocopico_develop"][$("#platform").val()];
-          var isselect = false;
-          for (var i = 0; i < $("#version")[0].options.length; i++) {
-            if (xreleases.includes($("#version")[0].options[i].value)) {
-              $("#version")[0].options[i].style.display = "block";
-              if (!isselect) {
-                $("#version")[0].options[i].selected = true;
-                isselect = true;
+      function changeRepository() {
+        repository = $("#repository").val();
+        var xreleases = Object.keys(_loads[repository]).sort();
+        $("#platform")[0].options.length = 0;
+        for (var i in xreleases) {
+          var isFind = false;
+          var keys = Object.keys(_lkms["wjz304"]);
+          for (var key in keys) {
+            if (keys[key].startsWith(xreleases[i].replace("+", "p").toLowerCase())) {
+              var lkms = Object.keys(_lkms["wjz304"][keys[key]]);
+              for (lkm in lkms) {
+                if (lkms[lkm].endsWith("*") || lkms[lkm].endsWith("#")) {
+                  continue;
+                }
+                isFind = true;
+                break;
               }
-            } else {
-              $("#version")[0].options[i].style.display = "none";
             }
+            if (isFind == true) break;
           }
-          $("#version").on("change", changeversion);
-          changeversion();
-        });
+          if (isFind == true)
+            $("#platform")[0].options.add(new Option(xreleases[i], xreleases[i]));
+        }
+        changePlatform();
       }
 
-      function changeversion() {
-        httpGetAsync(cdn + "loads.json" + "?+Math.random()", function (result) {
-          result = JSON.parse(result);
-          var xreleases = result["jumkey_develop"][$("#platform").val()];
-          var isselect = false;
+      function changePlatform() {
+        repository = $("#repository").val();
+        platform = $("#platform").val();
 
-          for (var i = 0; i < $("#exp")[0].options.length; i++) {
-            if ($("#exp")[0].options[i].value == "jumkey") {
-              if (
-                result["jumkey_develop"].hasOwnProperty($("#platform").val()) &&
-                result["jumkey_develop"][$("#platform").val()].includes(
-                  $("#version").val()
-                )
-              ) {
-                $("#exp")[0].options[i].style.display = "block";
-                $("#exp")[0].options[i].selected = true;
-              } else {
-                $("#exp")[0].options[i].style.display = "none";
-                $("#exp")[0].options[i].selected = false;
+        var xreleases = _loads[repository][platform].reverse();
+        $("#version")[0].options.length = 0;
+        for (var i in xreleases) { 
+          var isFind = false;
+          var keys = Object.keys(_lkms["wjz304"]);
+          for (var key in keys) {
+            if (keys[key].startsWith(platform.replace("+", "p").toLowerCase()) && keys[key].endsWith(xreleases[i].split("-")[1])) {
+              var lkms = Object.keys(_lkms["wjz304"][keys[key]]);
+              for (lkm in lkms) {
+                if (lkms[lkm].endsWith("*") || lkms[lkm].endsWith("#")) {
+                  continue;
+                }
+                isFind = true;
+                break;
               }
             }
+            if (isFind == true) break;
           }
-          for (var i in $("#jun")[0].options) {
-            if ($("#jun")[0].options[i].value == "1") {
-              if (["7.0.1-42218"].includes($("#version").val())) {
-                $("#jun")[0].options[i].style.display = "block";
-                $("#jun")[0].options[i].selected = true;
-              } else {
-                $("#jun")[0].options[i].style.display = "none";
-                $("#jun")[0].options[i].selected = false;
+          if (isFind == true)
+            $("#version")[0].options.add(new Option(xreleases[i], xreleases[i]));
+        }
+        changeVersion();
+      }
+
+      function changeVersion() {
+        changeLkm();
+        createExtBtn();
+      }
+
+      function changeLkm() {
+        repository = $("#repository").val();
+        platform = $("#platform").val().replace("+", "p").toLowerCase();
+        version = $("#version").val().split("-")[1];
+
+        var keys = Object.keys(_lkms["wjz304"]);
+        $("#lkm")[0].options.length = 0;
+        for (var key in keys) {
+          if (keys[key].startsWith(platform) && keys[key].endsWith(version)) {
+            var lkms = Object.keys(_lkms["wjz304"][keys[key]]);
+            for (lkm in lkms) {
+              if (lkms[lkm].endsWith("*") || lkms[lkm].endsWith("#")) {
+                continue;
               }
+              $("#lkm")[0].options.add(new Option(lkms[lkm], lkms[lkm]));
             }
+            break;
           }
-          createExtBtn();
-        });
+        }
       }
 
       function createExtBtn() {
         platform = $("#platform").val().replace("+", "p").toLowerCase();
         version = $("#version").val().split("-")[1];
         var exts = {};
-        httpGetAsync(cdn + "exts.json" + "?+Math.random()", function (result) {
+        httpGetAsync(cdn + "exts.json" + "?" + Math.random(), function (result) {
           result = JSON.parse(result);
           extskey = "pocopico";
           if (dev == "1") extskey = "wjz304";
@@ -292,6 +316,8 @@
             html +=
               '<span class="pl-mi1">点击驱动名添加/删除 (* 结尾的为无效驱动, # 结尾的为sha256错误驱动, */# 强制添加将编译失败.) </span><br />';
             html +=
+              '<button type="button" class="btn btn-primary btn-sm mt-2" id="ext_btn_-dtb" onclick="return processext(\'-dtb\')" autofocus="" title="1111111111">-dtb</button>&nbsp;';
+            html +=
               '<button type="button" class="btn btn-primary btn-sm mt-2" id="ext_btn_-virtio" onclick="return processext(\'-virtio\')" autofocus="" title="Adds VirtIO support for fast network/PCI/SCSI/network/console paravirtualization under QEmu (Proxmox, VirtualBox, virsh, and similar)">-virtio</button>&nbsp;';
             html +=
               '<button type="button" class="btn btn-primary btn-sm mt-2" id="ext_btn_-acpid2" onclick="return processext(\'-acpid2\')" autofocus="" title="ACPI Daemon v2 that handles power button events">-acpid2</button>&nbsp;';
@@ -300,7 +326,7 @@
             html +=
               '<button type="button" class="btn btn-primary btn-sm mt-2" id="ext_btn_-boot-wait" disabled="true" onclick="return processext(\'-boot-wait\')" autofocus="" title="Simple extension which stops the execution early waiting for the boot device to appear">-boot-wait</button>&nbsp;';
             html +=
-              '<span class="pl-md">(注意: boot-wait, misc, acpid2, virtio 默认会进行判断添加, 此处以"-" 开头代表删除, 无特殊需求请勿删!!!.)</span><br />';
+              '<span class="pl-md">(注意: boot-wait, misc, acpid2, virtio, dtb 默认会进行判断添加(不是一定有), 此处以"-" 开头代表删除, 无特殊需求请勿删!!!.)</span><br />';
           }
           for (var ext in exts) {
             var par = "";
@@ -352,9 +378,9 @@
         let formData = new FormData(form);
         var title = "Custom";
         var body = {};
-
+        //body["info"] = "整个编译过程一般在5分钟左右(受驱动数量和版本影响), 并发较多时有概率出现未触发或者网络阻塞的情况, 如长时间未收到[bot]的回复, 请reopen或者重新创建Issue.";
         httpGetAsync(
-          cdn + "parameter.json" + "?+Math.random()",
+          cdn + "parameter.json" + "?" + Math.random(),
           function (result) {
             result = JSON.parse(result);
             for (var key in result) {
@@ -371,6 +397,7 @@
                 body[name] = formData.get(`inputs[${name}]`);
               }
             }
+
             if (dev == "1") body["dev"] = "1";
             body = JSON.stringify(body).replace(/\+/g, "%2b");
             window.location.href = `https://github.com/${repo}/issues/new?title=${title}&body=${body}`;
@@ -471,6 +498,10 @@
             >Public</span
           >
         </div>
+        <div class="btn-link tabnav-tab preview-tab js-preview-tab flex-1 flex-md-auto width-full">
+          <marquee id="content" direction="up" height="36" scrollamount="2">
+          </marquee>
+        </div>
       </div>
       <div data-replace-remote-form-target="" class="workflow-dispatch">
         <form id="inputs">
@@ -484,11 +515,6 @@
           </button>
         </form>
       </div>
-      <br />
-      <div
-        id="content"
-        class="highlight highlight-source-diff notranslate position-relative overflow-auto"
-      ></div>
     </div>
     <footer
       class="footer width-full container-xl mt-3 text-center color-fg-muted"

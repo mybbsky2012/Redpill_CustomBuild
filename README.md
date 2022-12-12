@@ -4,12 +4,18 @@
 
 ## 介绍  
 [Redpill_CustomBuild](https://github.com/wjz304/Redpill_CustomBuild)  
+[Redpill_CustomBuild_v1](https://github.com/wjz304/Redpill_CustomBuild_v1)(old)  
 一个自定义配置及驱动并通过 Github Action 编译 DSM redpill 引导的平台.  
 本库并没有实际的技术创新, 仅做了一个参数适配, 使一些定制更简单, 并把过程搬到线上, 依赖微软强大的服务器使其快速得到想要的引导文件.  
 高度依赖以下大佬的项目, 请给以下各位大佬点赞.
 >源码仓库： [@RedPill-TTG](https://github.com/RedPill-TTG/redpill-load)  
->编译来源： [@pocopico](https://github.com/pocopico/redpill-load) [@jumkey](https://github.com/jumkey/redpill-load)  
->驱动来源： [@pocopico](https://github.com/pocopico/rp-ext)  
+>编译来源： [@pocopico](https://github.com/pocopico/redpill-load) [@jumkey](https://github.com/jumkey/redpill-load) [@PeterSuh-Q3](https://github.com/PeterSuh-Q3/redpill-load) [@fbelavenuto](https://github.com/fbelavenuto/arpl)  
+>驱动来源： [@pocopico](https://github.com/pocopico/rp-ext) [@jim3ma](https://github.com/jim3ma/synology-igc) [@fbelavenuto](https://github.com/fbelavenuto/r8125)  
+
+在此, 再次, 声明!!!  
+本人只是按照通用编译流程整合各位大佬的redpill-load 进行编译. 我只是解决编译的问题, 任何引导内部问题我都解决不了(当然知道的问题肯定会协助大家解决).  
+说通俗点, 我只是相当于一个物流, 你要哪家(大佬)的货(引导)我就给你配送哪家(大佬)的货(引导).
+
 
 > 😎 为什么用 GitHub Action？  
 > 托管于 GitHub 服务器, 只要 GitHub 不宕机, 它就不受影响(Private 项目每月有 2000 次的限制, Public 项目无限制).
@@ -21,7 +27,7 @@
 [【👉快速创建】(dev)](https://wjz304.github.io/Redpill_CustomBuild/Issues.html?dev=1)  
 `普通模式默认使用pocopico的驱动库, dev模式默认使用我fork的驱动库(如果报 Checksum 错, 请尝试使用(dev)模式), `  
 `并发较多时, 有概率出现curl错误或者 未触发编译的情况, 过几分钟再试...`  
-
+`如果你看不懂, 或者其他疑难杂症, 请不要浪费时间. 尝试使用arpl构建. https://github.com/fbelavenuto/arpl`
 
 ## 使用  
 在本项目 Issues 中创建问题(符合下述规范), 按需填写即可发起定制构建[【👉图文说明】](https://github.com/wjz304/Redpill_CustomBuild/blob/main/guide/Issues.md) [【👉注意事项】](https://github.com/wjz304/Redpill_CustomBuild/blob/main/tips.md).  
@@ -33,8 +39,10 @@
 
 参数             | 必选 |     默认值     | 说明  
 -----------------|------|----------------|---------  
-platform         | √    |"DS3622xs+"     | 请选择你需要编译的型号. "DS918+", "DS920+", "DS1621+", "DS2422+", "DS3615xs", "DS3617xs", "DS3622xs+", "DVA1622", "DVA3221","RS4021xs+"  
-version          | √    |"7.0.1-42218"   | 请选择你需要编译的版本. "7.1.1-42962", "7.1.0-42661", "7.0.1-42218", "6.2.4-25556"  
+repository       | √    |-               | 请选择编译依赖的基础库. "pocopico_develop", "pocopico_jun", "jumkey_develop", "PeterSuh-Q3_master"  
+platform         | √    |-               | 请选择你需要编译的型号. (具体包含型号以基础库支持为准)  
+version          | √    |-               | 请选择你需要编译的版本. (具体包含版本以基础库支持为准)  
+lkm              | ×    |-               | 如不了解请保持默认, 请选择 LKM 版本.(目前具体有何区别不详, 如无必要选默认的 redpill).  
 config           | ×    |-               | 如不了解请保持默认, 设置默认 user_config.json <sup>[①]()</sup>
 maxdisks         | ×    |-               | 如不了解请保持默认, 请输入最大硬盘数 maxdisks. 默认: 无, 范围: 1~32  
 maxlanport       | ×    |7               | 如不了解请保持默认, 请输入最大网卡索引 maxlanport. 默认: 7, 范围: 0~31  
@@ -46,13 +54,11 @@ usbportcfg       | ×    |-               | 如不了解请保持默认, 请输�
 netif_num        | ×    |2               | 请输入网卡数量 netif_num. 默认: 2, 范围: 1~8  
 vid              | ×    |"0x46f4"        | 请输入USB设备供应商识别码(Vender ID). 默认: 0x46f4  
 pid              | ×    |"0x0001"        | 请输入USB设备产品识别码(Product ID). 默认: 0x0001  
-diskidxmap       | ×    |-               | 请输入SATA控制器盘序 DiskIdxMap. <sup>[④]()</sup> DS920+, DS1621+, DS2422+, DVA1622 不需要填写. 默认: 无  
-sataportmap      | ×    |-               | 请输入SATA控制器盘数 SataPortMap. <sup>[④]()</sup> DS920+, DS1621+, DS2422+, DVA1622 不需要填写. 默认: 无  
-sasidxmap        | ×    |-               | 请输入SAS控制器盘数 SasIdxMap. <sup>[④]()</sup> DS920+, DS1621+, DS2422+, DVA1622 不需要填写. 默认: 无  
-dtb              | ×    |-               | 请输入dtb 文件的下载链接(支持的文件类型: .dts,.dtb,.tar.gz,.zip), 仅 DS920+, DS1621+, DS2422+, DVA1622 需要填写, 其他型号请勿填写. [#47](https://github.com/wjz304/Redpill_CustomBuild/issues/47)  
+diskidxmap       | ×    |-               | 请输入SATA控制器盘序 DiskIdxMap. <sup>[④]()</sup> DS920+, DS923+, DS1520+, DS1621+, DS2422+, DVA1622 不需要填写. 默认: 无  
+sataportmap      | ×    |-               | 请输入SATA控制器盘数 SataPortMap. <sup>[④]()</sup> DS920+, DS923+, DS1520+, DS1621+, DS2422+, DVA1622 不需要填写. 默认: 无  
+sasidxmap        | ×    |-               | 请输入SAS控制器盘数 SasIdxMap. <sup>[④]()</sup> DS920+, DS923+, DS1520+, DS1621+, DS2422+, DVA1622 不需要填写. 默认: 无  
+dtb              | ×    |-               | 请输入dtb 文件的下载链接(支持的文件类型: .dts,.dtb,.tar.gz,.zip), 仅 DS920+, DS923+, DS1520+, DS1621+, DS2422+, DVA1622 需要填写, 其他型号请勿填写. [#47](https://github.com/wjz304/Redpill_CustomBuild/issues/47)  
 ext              | ×    |-               | 请输入需要集成的扩展, 多个请以 "," 间隔. 支持名字（pocopico库）或者链接，名字参考[exts.json](./exts.json). eg: "r8125, tg3" 
-exp              | ×    |"pocopico"      | 请选择编译依赖的基础库. "pocopico", "jumkey"  
-jun              | ×    |"0"             | 仅7.0.1-42218 版本可以选择jun模式，jun模式 支持 7.0.1~7.1.1 的 DSM.  
 \-               | ×    |-               | 高级自定义 <sup>[③]()</sup>  
 
 ```
@@ -83,40 +89,47 @@ jun              | ×    |"0"             | 仅7.0.1-42218 版本可以选择jun
 
 ## 举例
 * 普通参数示例:
-  - {"platform":"DS3622xs+", "version":"7.0.1-42218", "ext":"r8125, tg3"}  
-  - {"platform":"DS3622xs+", "version":"7.0.1-42218", "exp": "jumkey", "jun":"1", "ext":"r8125, tg3"}  
-  - {"platform":"DS3622xs+", "version":"7.0.1-42218", "vid":"0x0525", "pid":"0xa4a5"}  
-  - {"platform":"DS3622xs+", "version":"7.0.1-42218", "diskidxmap":"00", "sataportmap":"6", "ext":"r8125"}  
-  - {"platform":"DS3622xs+", "version":"7.0.1-42218", "maxdisks":"16", "maxlanport":"7", "ext":"r8125"}  
+  - {"repository":"pocopico_develop", "platform":"DS3622xs+", "version":"7.0.1-42218", "lkm":"redpill", "ext":"r8125, tg3"}  
+  - {"repository": "jumkey_develop", "platform":"DS3622xs+", "version":"7.0.1-42218", "lkm":"redpill", "ext":"r8125, tg3"}  
+  - {"repository":"pocopico_develop", "platform":"DS3622xs+", "version":"7.0.1-42218", "lkm":"redpill", "vid":"0x0525", "pid":"0xa4a5"}  
+  - {"repository":"pocopico_develop", "platform":"DS3622xs+", "version":"7.0.1-42218", "lkm":"redpill", "diskidxmap":"00", "sataportmap":"6", "ext":"r8125"}  
+  - {"repository":"pocopico_develop", "platform":"DS3622xs+", "version":"7.0.1-42218", "lkm":"redpill", "maxdisks":"16", "maxlanport":"7", "ext":"r8125"}  
   - {  
+      "repository":"pocopico_develop",  
       "platform":"DS3622xs+",  
       "version":"7.0.1-42218",  
-      "jun":"1",  
-      "exp": "jumkey",  
+      "lkm":"redpill",  
       "netif_num":"3",  
       "ext":"r8125, r8168, e1000e, igb, vmxnet3, ixgbe"  
     }  
-* dtb参数示例:
-  - {"platform":"DS920+",  
-      "version":"7.0.1-42218",  
-      "dtb": "https://github.com/wjz304/Redpill_CustomBuildfiles/9235785/ds920p.zip",  
-      "ext":"r8125"
-    }  
-* ext参数链接示例:
+* dtb参数示例:  
   - {  
+      "repository":"pocopico_develop",  
+      "platform":"DS920+",  
+      "version":"7.0.1-42218",  
+      "lkm":"redpill",  
+      "dtb": "https://github.com/wjz304/Redpill_CustomBuildfiles/9235785/ds920p.zip",  
+      "ext":"r8125"  
+    }  
+* ext参数链接示例:  
+  - {  
+      "repository":"pocopico_develop",  
       "platform":"DS3622xs+",  
       "version":"7.1.1-42962",  
+      "lkm":"redpill",  
       "ext":"r8125, e1000, e1000e, vmxnet3, https://raw.githubusercontent.com/wjz304/rp-ext/main/rtl8150/rpext-index.json"  
     }
-* config参数示例:
+* config参数示例:  
   - {  
+      "repository":"pocopico_develop",  
       "platform":"DS3622xs+",  
       "version":"7.0.1-42218",  
+      "lkm":"redpill",  
       "config":{"ramdisk_copy": {}},  
       "ext":"r8125, e1000, e1000e, vmxnet3"  
     }  
 * 高级自定义示例:
-  - {"platform":"DS3622xs+", "version":"7.0.1-42218", "jun":"1", "ext":"r8125,e1000e,vmxnet3"}  
+  - {"repository":"pocopico_develop", "platform":"DS3622xs+", "version":"7.0.1-42218", "lkm":"redpill", "ext":"r8125,e1000e,vmxnet3"}  
     \`\`\`  
     echo "${platform}"  
     \`\`\`  
@@ -131,5 +144,6 @@ jun              | ×    |"0"             | 仅7.0.1-42218 版本可以选择jun
 https://github.com/RedPill-TTG/redpill-load  
 https://github.com/jumkey/redpill-load  
 https://github.com/pocopico/redpill-load  
+https://github.com/PeterSuh-Q3/redpill-load  
 https://github.com/Online24Hours/Redpill_Build  
 
