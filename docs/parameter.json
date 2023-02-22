@@ -10,7 +10,7 @@
     "repository": {
         "name": "repository",
         "description": "请选择编译依赖的基础库.(pocopico_develop 以外均为默认jun模式)",
-        "detailedinfo": "请选择编译依赖的基础库.型号和版本均已库支持为准.",
+        "detailedinfo": "请选择编译依赖的基础库.型号和版本均已库支持为准.\nwjz304_test*仅用于编译测试, 请勿选.",
         "required": true,
         "default": "pocopico",
         "type": "choice",
@@ -18,7 +18,9 @@
             "pocopico_develop",
             "pocopico_jun",
             "jumkey_develop",
-            "PeterSuh-Q3_master"
+            "PeterSuh-Q3_master",
+            "wjz304_test-dev",
+            "wjz304_test-jun"
         ]
     },
     "platform": {
@@ -63,12 +65,11 @@
         "description": "如不了解请保持默认, 请选择 LKM 版本.(目前具体有何区别不详)",
         "detailedinfo": "请选择 LKM 版本",
         "required": false,
-        "default": "redpill",
+        "default": "dev",
         "type": "choice",
         "options": [
-            "redpill",
-            "redpilldev",
-            "redpillprod"
+            "dev",
+            "prod"
         ]
     },
     "config": {
@@ -98,7 +99,7 @@
     "internalportcfg": {
         "name": "internalportcfg",
         "description": "如不了解请保持默认, 请输入 sata 接口配置 internalportcfg(十六进制数). 默认: 0xffff",
-        "detailedinfo": "以上数值为16进制, 将其转换为2进制进行理解.\n群晖内使用“1”表示存在这个接口, “0”表示不存在这个接口.\n 0xffff 转为2进制为“1111,1111”, 即 1-8 号硬盘为内部sata硬盘\n与esataportcfg和usbportcfg不应该出现重复.",
+        "detailedinfo": "以上数值为16进制, 将其转换为2进制进行理解.\n群晖内使用“1”表示存在这个接口, “0”表示不存在这个接口.\n 0xffff 转为2进制为“1111,1111,1111,1111”, 即 1-16 号硬盘为内部sata硬盘\n与esataportcfg和usbportcfg不应该出现重复.",
         "required": false,
         "default": "0xffff",
         "type": "string"
@@ -106,7 +107,7 @@
     "esataportcfg": {
         "name": "esataportcfg",
         "description": "如不了解请保持默认, 请输入 esata 接口配置 esataportcfg(十六进制数). 默认: 无",
-        "detailedinfo": "以上数值为16进制, 将其转换为2进制进行理解.\n群晖内使用“1”表示存在这个接口, “0”表示不存在这个接口.\n 0xf000 转为2进制为“1100,0000”, 即 7-8 号硬盘为内部esata硬盘\n与internalportcfg和usbportcfg不应该出现重复.",
+        "detailedinfo": "以上数值为16进制, 将其转换为2进制进行理解.\n群晖内使用“1”表示存在这个接口, “0”表示不存在这个接口.\n 0xf000 转为2进制为“1111,0000,0000,0000”, 即 13-16 号硬盘为内部esata硬盘\n与internalportcfg和usbportcfg不应该出现重复.",
         "required": false,
         "default": "",
         "type": "string"
@@ -114,7 +115,7 @@
     "usbportcfg": {
         "name": "usbportcfg",
         "description": "如不了解请保持默认, 请输入 usb 接口配置 usbportcfg(十六进制数). 默认: 无",
-        "detailedinfo": "以上数值为16进制, 将其转换为2进制进行理解.\n群晖内使用“1”表示存在这个接口, “0”表示不存在这个接口.\n 0xf0 转为2进制为“1100”, 即 3-4 号硬盘为usb硬盘\n与internalportcfg和esataportcfg不应该出现重复.",
+        "detailedinfo": "以上数值为16进制, 将其转换为2进制进行理解.\n群晖内使用“1”表示存在这个接口, “0”表示不存在这个接口.\n 0xf0 转为2进制为“1111,0000”, 即 5-8 号硬盘为usb硬盘\n与internalportcfg和esataportcfg不应该出现重复.",
         "required": false,
         "default": "",
         "type": "string"
@@ -162,7 +163,7 @@
     "diskidxmap": {
         "name": "diskidxmap",
         "description": "请输入SATA控制器盘序 DiskIdxMap. 部分型号不需要填写(鼠标悬停查看气泡). 默认: 无",
-        "detailedinfo": "不需要填写的型号: DS920+, DS923+, DS1520+, DS1621+, DS2422+, DVA1622, FS2500, SA6400. \n按顺序从左到右每两位数为一个控制器的盘序数值,这两位数为16进制数, 不足两位前面补0,\n比如SataPortMap=148 时 DiskIdxMap=000105 的表示:\n第一个控制器的磁盘从序号1开始往后排,\n第二个控制器的磁盘从序号2开始往后排,\n第三个驱动器的磁盘从序号5开始往后排.\n此时在群晖系统里面看到磁盘序号就是1-13连续的.",
+        "detailedinfo": "不需要填写的型号: DS920+, DS923+, DS1520+, DS1621+, DS1821+, DS2422+, DVA1622, FS2500, SA6400. \n按顺序从左到右每两位数为一个控制器的盘序数值,这两位数为16进制数, 不足两位前面补0,\n比如SataPortMap=148 时 DiskIdxMap=000105 的表示:\n第一个控制器的磁盘从序号1开始往后排,\n第二个控制器的磁盘从序号2开始往后排,\n第三个驱动器的磁盘从序号6开始往后排.\n此时在群晖系统里面看到磁盘序号就是1-13连续的.",
         "required": false,
         "default": "",
         "type": "string"
@@ -170,7 +171,7 @@
     "sataportmap": {
         "name": "sataportmap",
         "description": "请输入SATA控制器盘数 SataPortMap. 部分型号不需要填写(鼠标悬停查看气泡). 默认: 无",
-        "detailedinfo": "不需要填写的型号: DS920+, DS923+, DS1520+, DS1621+, DS2422+, DVA1622, FS2500, SA6400. \n在群辉系统中, 一个控制器默认只能控制9个硬盘, 所以SataPortMap=的数值范围只能是0-9,\n0则表示屏蔽该控制器, 不可以设为SataPortMap=0来隐藏引导盘!\nSataPortMap=148表示第一个控制器有1个硬盘, 第二个控制器有4个硬盘, 第三个控制器有8个硬盘.",
+        "detailedinfo": "不需要填写的型号: DS920+, DS923+, DS1520+, DS1621+, DS1821+, DS2422+, DVA1622, FS2500, SA6400. \n在群辉系统中, 一个控制器默认只能控制9个硬盘, 所以SataPortMap=的数值范围只能是0-9,\n0则表示屏蔽该控制器, 不可以设为SataPortMap=0来隐藏引导盘!\nSataPortMap=148表示第一个控制器有1个硬盘, 第二个控制器有4个硬盘, 第三个控制器有8个硬盘.",
         "required": false,
         "default": "",
         "type": "string"
@@ -178,7 +179,7 @@
     "sasidxmap": {
         "name": "sasidxmap",
         "description": "请输入SAS控制器盘数 SasIdxMap. 部分型号不需要填写(鼠标悬停查看气泡). 默认: 无",
-        "detailedinfo": "不需要填写的型号: DS920+, DS923+, DS1520+, DS1621+, DS2422+, DVA1622, FS2500, SA6400. \n默认使用SATA硬盘的时候设置为0.",
+        "detailedinfo": "不需要填写的型号: DS920+, DS923+, DS1520+, DS1621+, DS1821+, DS2422+, DVA1622, FS2500, SA6400. \n默认使用SATA硬盘的时候设置为0.",
         "required": false,
         "default": "",
         "type": "string"
@@ -186,7 +187,7 @@
     "dtb": {
         "name": "dtb",
         "description": "请输入 dtb 文件的下载链接(空:自动), 仅部分型号需要填写(鼠标悬停查看气泡). ",
-        "detailedinfo": "需要填写的型号: DS920+, DS923+, DS1520+, DS1621+, DS2422+, DVA1622, FS2500, SA6400. \n需要自行制作dts/dtb 文件, 制作方法参考主页说明. (支持的文件类型: .dts,.dtb,.tar.gz,.zip)\n该字段可填入两种类型:\n空(不填写): 将自动编译.(适用于硬盘数<=4个 且不需要插满.).\nURL(dtb的下载链接): 将在编译时植入使用.",
+        "detailedinfo": "需要填写的型号: DS920+, DS923+, DS1520+, DS1621+, DS1821+, DS2422+, DVA1622, FS2500, SA6400. \n需要自行制作dts/dtb 文件, 制作方法参考主页说明. (支持的文件类型: .dts,.dtb,.tar.gz,.zip)\n该字段可填入三种类型:\n空(不填写): 将自动编译.(适用于硬盘数<=4个 且不需要插满.).\n空(不填写)且ext中加入‘-dtb,dtbpatch’: 将自动编译.(自动识别已插入硬盘（增加硬盘重启即可）).\nURL(dtb的下载链接): 将在编译时植入使用.",
         "required": false,
         "default": "",
         "type": "string"

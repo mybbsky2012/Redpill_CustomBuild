@@ -10,12 +10,13 @@ chmod a+x dtbpatch
 # wget --no-check-certificate https://raw.githubusercontent.com/pocopico/rp-ext/main/dtbpatch/releases/dtc
 wget --no-check-certificate https://fastly.jsdelivr.net/gh/pocopico/rp-ext@main/dtbpatch/releases/dtc
 chmod a+x dtc
-./dtc -I dtb -O dts output.dtb > output.dts
+./dtc -I dtb -O dts output.dtb > output.dts     #
+#./dtc -q -I dts -O dtb output.dts > output.dtb  #
 
-echo Please enter the following link on your PC to download the dtb file：
-curl -fsSL --insecure -w '\n' --upload-file output.dtb https://transfer.sh
+echo Please enter the following link on your PC to download the dtb file:
+curl -sSL --insecure -w '\n' --upload-file output.dtb https://transfer.sh
 echo 
 
-echo Please enter the following link on your PC to download the dts file：
-curl -fsSL --insecure -w '\n' --upload-file output.dts https://transfer.sh
+echo Please enter the following link on your PC to download the dts file:
+curl -sSL --insecure -w '\n' --upload-file output.dts https://transfer.sh
 echo 

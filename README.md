@@ -4,7 +4,6 @@
 
 ## 介绍  
 [Redpill_CustomBuild](https://github.com/wjz304/Redpill_CustomBuild)  
-[Redpill_CustomBuild_v1](https://github.com/wjz304/Redpill_CustomBuild_v1)(old)  
 一个自定义配置及驱动并通过 Github Action 编译 DSM redpill 引导的平台.  
 本库并没有实际的技术创新, 仅做了一个参数适配, 使一些定制更简单, 并把过程搬到线上, 依赖微软强大的服务器使其快速得到想要的引导文件.  
 高度依赖以下大佬的项目, 请给以下各位大佬点赞.
@@ -30,7 +29,7 @@
 `如果你看不懂, 或者其他疑难杂症, 请不要浪费时间. 尝试使用arpl构建. https://github.com/fbelavenuto/arpl`
 
 ## 使用  
-在本项目 Issues 中创建问题(符合下述规范), 按需填写即可发起定制构建[【👉图文说明】](https://github.com/wjz304/Redpill_CustomBuild/blob/main/guide/Issues.md) [【👉注意事项】](https://github.com/wjz304/Redpill_CustomBuild/blob/main/tips.md).  
+在本项目 Issues 中创建问题(符合下述规范), 按需填写即可发起定制构建[【👉图文说明】](https://github.com/wjz304/Redpill_CustomBuild/blob/main/guide/Issues.md) [【👉注意事项】](https://github.com/wjz304/Redpill_CustomBuild/blob/main/docs/tips.md).  
 
 ### Issue title:
 标题请以 custom 开头(不区分大小写), 且不要包含'(单引号),"(双引号) 等转义字符.
@@ -58,7 +57,7 @@ diskidxmap       | ×    |-               | 请输入SATA控制器盘序 DiskIdx
 sataportmap      | ×    |-               | 请输入SATA控制器盘数 SataPortMap. <sup>[④]()</sup> DS920+, DS923+, DS1520+, DS1621+, DS2422+, DVA1622 不需要填写. 默认: 无  
 sasidxmap        | ×    |-               | 请输入SAS控制器盘数 SasIdxMap. <sup>[④]()</sup> DS920+, DS923+, DS1520+, DS1621+, DS2422+, DVA1622 不需要填写. 默认: 无  
 dtb              | ×    |-               | 请输入dtb 文件的下载链接(支持的文件类型: .dts,.dtb,.tar.gz,.zip), 仅 DS920+, DS923+, DS1520+, DS1621+, DS2422+, DVA1622 需要填写, 其他型号请勿填写. [#47](https://github.com/wjz304/Redpill_CustomBuild/issues/47)  
-ext              | ×    |-               | 请输入需要集成的扩展, 多个请以 "," 间隔. 支持名字（pocopico库）或者链接，名字参考[exts.json](./exts.json). eg: "r8125, tg3" 
+ext              | ×    |-               | 请输入需要集成的扩展, 多个请以 "," 间隔. 支持名字（pocopico库）或者链接，名字参考[exts.json](./docs/exts.json). eg: "r8125, tg3" 
 \-               | ×    |-               | 高级自定义 <sup>[③]()</sup>  
 
 ```
@@ -69,6 +68,12 @@ ext              | ×    |-               | 请输入需要集成的扩展, 多�
   - 在 body 中 以 ```xxx``` 包裹自定义的 shell 命令, 将在 build 前运行. 参考[#3](https://github.com/wjz304/Redpill_CustomBuild/issues/3) 
 ④：详细信息请查看：https://github.com/wjz304/Redpill_CustomBuild/issues/1252#issuecomment-1242677916
 ```
+#### 关于 dtb 现在共3种形式：  
+ \  | 参数 |     说明  
+---|------|---------  
+1 | dtb参数 填写 dtb/dts 的下载链接 | 内部会自动加入 redpill-dtb-static, 并替换自定义的 dtb 到 redpill-dtb-static 中.  
+2 | dtb参数 为空 | 内部会自动加入 redpill-dtb, redpill-dtb 将识别硬盘pci位置自动修改dtb, 支持≤4个硬盘热插拔.  
+3 | dtb参数 为空, ext 加入 "-dtb,dtbpatch" | 内部会加入 dtbpatch, 自动识别已插入硬盘(增加硬盘重启即可).  
 
 ## 说明
 0. __感谢 [hoping](https://github.com/htmambo) 大佬制作的 WEB 界面.__  
@@ -85,7 +90,7 @@ ext              | ×    |-               | 请输入需要集成的扩展, 多�
   但是快速创建的WEB页面由于 涉及 guthub 的 pages, 且含有CDN加速, 存在一些硬编码, 如要使用, 需要开通pages后方可使用.  
 10. 在Issues下评论 "transfer" 附件转快传 🚲->🏍. (请勿重复发, 转换操作时间 ≈ 该Issue编译成功次数 X 3分钟).
 11. 在Issues下评论 "delete builds" 即可删该Issues的所有历史编译记录.
-12. Web页 Title 后面的红色标签是可以点击的哦!(***PS：只有读到这里的人才会知道.***)  
+12. Web页 Title 后面的红色标签是可以点击的哦!(***PS：只有读到这里的人才会知道.***).  
 
 ## 举例
 * 普通参数示例:

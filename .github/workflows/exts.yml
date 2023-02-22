@@ -26,6 +26,9 @@ jobs:
           git config --global user.name "github-actions[bot]"
           sudo timedatectl set-timezone "Asia/Shanghai"
 
+          sudo apt install build-essential libtool pkgconf libzstd-dev liblzma-dev libssl-dev
+          pip install requests BeautifulSoup4 kmodule
+
       - name: Checkout rp-ext s
         run: |
           sudo rm -rf rp-ext_pocopico
@@ -132,48 +135,8 @@ jobs:
                   print(err)
               return exts
 
-          def getlkmslist(work = 'rp-ext', reglist=[]):
-              lkms = {}
-              try:
-                  jext = 'rpext-index.json'
-                  extdirs = os.listdir(os.path.join(root, work))
-                  extdirs.sort()
-                  print(extdirs)
-                  for extdir in extdirs:
-                      if not extdir.startswith('redpill') or '-' in extdir:
-                          continue
-                      if os.path.isdir(os.path.join(root, work, extdir)):
-                          data_index = getjsonfile(os.path.join(root, work, extdir, jext))
-                          if data_index != None:
-                              try:
-                                  keys = data_index["releases"].keys()
-                                  for key in keys:
-                                      suffix = ''
-                                      data_releases = getjsonfile(os.path.join(root, work, pathstrsub(data_index["releases"][key], reglist)))
-                                      if data_releases != None:
-                                          if "files" in data_releases:
-                                              for file in data_releases["files"]:
-                                                  sha256_online = file["sha256"]
-                                                  sha256_local = sha256sum(os.path.join(root, work, pathstrsub( file["url"], reglist)))
-                                                  if sha256_online != sha256_local:
-                                                      suffix = '#'
-                                                      print('file: {} -- key: {} -- error: {} -- really: {}'.format(pathstrsub(data_index["releases"][key], reglist), pathstrsub(file["url"], reglist), sha256_online, sha256_local))
-                                      else:
-                                          suffix = '*'
-                                          print('file: {} -- may not exists'.format(pathstrsub(data_index["releases"][key], reglist)))
-                                      if key in lkms.keys():
-                                          lkms[key][extdir + suffix] = data_index["info"]["description"]
-                                      else:
-                                          lkms[key] = { extdir + suffix: data_index["info"]["description"]}
-                              except Exception as err:
-                                  print(err)
-              except Exception as err:
-                  print(err)
-              return lkms
-
           if __name__ == '__main__':
               exts = {}
-              lkms = {}
               print('####################### pocopico #######################')
               reglist=[]
               reglist.append(['https://raw.githubusercontent.com/pocopico/rp-ext/master/',''])
@@ -181,66 +144,40 @@ jobs:
               reglist.append(['https://github.com/pocopico/rp-ext/blob/main/',''])
               reglist.append(['https://raw.githubusercontent.com/jim3ma/synology-igc/master/',''])
               exts["pocopico"] = getextslist('rp-ext_pocopico', reglist)
-              lkms["pocopico"] = getlkmslist('rp-ext_pocopico', reglist)
 
               print('#######################  wjz304  #######################')
               reglist=[]
               reglist.append(['https://raw.githubusercontent.com/wjz304/rp-ext/master/',''])
               reglist.append(['https://raw.githubusercontent.com/jim3ma/synology-igc/master/',''])
               exts["wjz304"] = getextslist('rp-ext_wjz304', reglist)
-              lkms["wjz304"] = getlkmslist('rp-ext_wjz304', reglist)
 
               if len(exts) > 0:
                   print('#######################   exts   #######################')
                   print(json.dumps(exts, indent=4))
-                  with open(os.path.join(root, 'exts.json'), 'w', encoding='utf-8') as f:
+                  with open(os.path.join(root, 'docs/exts.json'), 'w', encoding='utf-8') as f:
                       f.write(json.dumps(exts, indent=4))
 
-              if len(lkms) > 0:
-                  print('#######################   lkms   #######################')
-                  print(json.dumps(lkms, indent=4))
-                  with open(os.path.join(root, 'lkms.json'), 'w', encoding='utf-8') as f:
-                      f.write(json.dumps(lkms, indent=4))
-
-      - name: Check and Push
-        run: |
-          if [ -n "$(git status -s | grep -E 'exts.json|lkms.json')" ]; then
-            git add $(git status -s | grep -E 'exts.json|lkms.json' | awk '{printf " %s", $2}')
-            git commit -m "update $(date +%Y-%m-%d" "%H:%M:%S)"
-            git push -f
-          fi
-
-
-  loads:
-    runs-on: ubuntu-latest
-    needs: exts
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-
-      - name: Initialization environment
-        run : |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-          sudo timedatectl set-timezone "Asia/Shanghai"
 
       - name: Checkout redpill-load s
         run: |
           sudo rm -rf redpill-load_pocopico_develop
           git clone --branch develop https://github.com/pocopico/redpill-load.git redpill-load_pocopico_develop
-          # https://github.com/pocopico/rp-ext/blob/main/redpill/rpext-index.json 并不包含 DS3617xs/6.2.4-25556, 线上无法获取
-          rm -rf redpill-load_pocopico_develop/config/DS3617xs/6.2.4-25556
 
           sudo rm -rf redpill-load_pocopico_jun
           git clone --branch jun https://github.com/pocopico/redpill-load.git redpill-load_pocopico_jun
-          # https://github.com/pocopico/rp-ext/blob/main/redpill/rpext-index.json 并不包含 DS3617xs/6.2.4-25556, 线上无法获取
-          rm -rf redpill-load_pocopico_jun/config/DS3617xs/6.2.4-25556
 
           sudo rm -rf redpill-load_jumkey_develop
           git clone --branch develop https://github.com/jumkey/redpill-load.git redpill-load_jumkey_develop
+          rm -rf redpill-load_jumkey_develop/config/DVA1622
 
           sudo rm -rf redpill-load_PeterSuh-Q3_master
           git clone --branch master https://github.com/PeterSuh-Q3/redpill-load.git redpill-load_PeterSuh-Q3_master
+
+          sudo rm -rf redpill-load_wjz304_test-dev
+          git clone --branch test-dev https://github.com/wjz304/redpill-load.git redpill-load_wjz304_test-dev
+
+          sudo rm -rf redpill-load_wjz304_test-jun
+          git clone --branch test-jun https://github.com/wjz304/redpill-load.git redpill-load_wjz304_test-jun
 
       - name: Get loads lsit
         shell: python
@@ -250,13 +187,9 @@ jobs:
 
           root = '' # os.path.dirname(os.path.abspath(__file__))
 
-          def getloadlist(work = 'redpill-load'):
+          def getloadlist(work = 'redpill-load', ignore=[]):
               load = {}
               try:
-                  lkms = {}
-                  with open('lkms.json', mode="r") as f:
-                      lkms = json.loads(f.read())['wjz304']    # 暂时只匹配自己
-
                   platforms = os.listdir(os.path.join(root, work, 'config'))
                   platforms.sort()
                   print(platforms)
@@ -268,13 +201,12 @@ jobs:
                           versions.sort()
                           print(versions)
                           for version in versions:
+                              if version in ignore:
+                                  continue
                               if os.path.exists(os.path.join(root, work, 'config', platform, version, 'config.json')):
-                                  key = platform.replace('+', 'p').lower() + '_' + version.split('-')[-1]
-                                  if key in lkms:
-                                      if not all(item.endswith('*') or item.endswith('#') for item in lkms[key]):
-                                          if platform not in load:
-                                              load[platform] = []
-                                          load[platform].append(version)
+                                  if platform not in load:
+                                      load[platform] = []
+                                  load[platform].append(version)
 
               except Exception as err:
                   print(err)
@@ -282,28 +214,181 @@ jobs:
 
           if __name__ == '__main__':
               loads = {}
+              ignore=['7.0-41222', '7.0-41890', '7.1.0-42550', '7.1.0-42621', '7.1.1-42951']
+
               print('################### pocopico_develop ###################')
-              loads["pocopico_develop"] = getloadlist('redpill-load_pocopico_develop')
+              loads["pocopico_develop"] = getloadlist('redpill-load_pocopico_develop', ignore)
 
               print('##################### pocopico_jun #####################')
-              loads["pocopico_jun"] = getloadlist('redpill-load_pocopico_jun')
+              loads["pocopico_jun"] = getloadlist('redpill-load_pocopico_jun', ignore)
 
               print('#################### jumkey_develop ####################')
-              loads["jumkey_develop"] = getloadlist('redpill-load_jumkey_develop')
+              loads["jumkey_develop"] = getloadlist('redpill-load_jumkey_develop', ignore)
 
               print('################## PeterSuh-Q3_master ##################')
-              loads["PeterSuh-Q3_master"] = getloadlist('redpill-load_PeterSuh-Q3_master')
+              loads["PeterSuh-Q3_master"] = getloadlist('redpill-load_PeterSuh-Q3_master', ignore)
+
+              print('################## wjz304_test-dev ##################')
+              loads["wjz304_test-dev"] = getloadlist('redpill-load_wjz304_test-dev', ignore)
+
+              print('################## wjz304_test-jun ##################')
+              loads["wjz304_test-jun"] = getloadlist('redpill-load_wjz304_test-jun', ignore)
 
               if len(loads) > 0:
                   print('#######################  loads   #######################')
                   print(json.dumps(loads, indent=4))
-                  with open(os.path.join(root, 'loads.json'), 'w', encoding='utf-8') as f:
+                  with open(os.path.join(root, 'docs/loads.json'), 'w', encoding='utf-8') as f:
                       f.write(json.dumps(loads, indent=4))
+
+
+      - name: Get models and toolchain lsit
+        shell: python
+        run: |
+          # -*- coding: utf-8 -*-
+          import os, re, json, requests
+          from bs4 import BeautifulSoup
+          
+          root = '' # os.path.dirname(os.path.abspath(__file__))
+
+          if __name__ == '__main__':
+
+              # models
+              req = requests.get('https://kb.synology.com/en-us/DSM/tutorial/What_kind_of_CPU_does_my_NAS_have')
+              req.encoding = 'utf-8'
+              bs=BeautifulSoup(req.text, 'html.parser')
+              p = re.compile(r"data: (.*?),$", re.MULTILINE | re.DOTALL)
+              data = json.loads(p.search(bs.find('script', string=p).prettify()).group(1))
+
+              models=[]
+              model='(.*?)'  # (.*?): all, FS6400: one
+              p = re.compile(r"\n\t\t\t<td>{}<\/td>\n\t\t\t<td>(.*?)<\/td>\n\t\t\t<td>(.*?)<\/td>\n\t\t\t<td>(.*?)<\/td>\n\t\t\t<td>(.*?)<\/td>\n\t\t\t<td>(.*?)<\/td>\n\t\t\t<td>(.*?)<\/td>\n\t\t".format(model), re.MULTILINE | re.DOTALL)
+              it = p.finditer(data["preload"]["content"])
+              for i in it:
+                  d = i.groups()
+                  if len(d) == 6: d = model + d
+                  models.append({"Model":d[0],"CPU Model":d[1],"Cores":d[2],"Threads":d[3],"FPU":d[4],"PackageArch":d[5].lower(),"RAM":d[6]})
+
+              print(json.dumps(models, indent=4))
+              with open(os.path.join(root, 'docs/models.json'), 'w', encoding='utf-8') as f:
+                  f.write(json.dumps(models, indent=4))
+
+
+              # toolchain
+              req = requests.get('https://archive.synology.cn/download/ToolChain/toolchain')
+              req.encoding = 'utf-8'
+              bs=BeautifulSoup(req.text, 'html.parser')
+              p = re.compile(r"(.*?)-(.*?)", re.MULTILINE | re.DOTALL)
+              l = bs.find_all('a', text=p)
+
+              toolchain = {}
+              for i in l:
+                  req = requests.get('https://archive.synology.cn{}'.format(i.attrs['href']))
+                  req.encoding = 'utf-8'
+                  bs=BeautifulSoup(req.text, 'html.parser')
+
+                  p = re.compile(r"^(.*?)Linux(.*?)\((.*?)\)$", re.MULTILINE | re.DOTALL)
+                  data = bs.find_all('td', text=p)
+                  for item in data:
+                      info = p.search(item.string).groups()
+                      if not i.string in toolchain.keys(): toolchain[i.string] = {}
+                      toolchain[i.string][info[2].strip().lower()] = info[1].replace('Linux', '').strip()
+                      print(info)
+              
+              print(toolchain)
+              with open(os.path.join(root, 'docs/toolchain.json'), 'w', encoding='utf-8') as f:
+                  f.write(json.dumps(toolchain, indent=4))
+
+              # patindo
+              models = {}
+              with open('doc/loads.json', 'r') as f:
+                  models = json.load(f)
+              for model in models.keys():
+                  req = requests.get('https://www.synology.com/api/support/findDownloadInfo?lang=en-us&product={}'.format(model.replace('+','%2B')))
+                  data = json.loads(req.text)
+                  data[]
+              
+              print(toolchain)
+              with open(os.path.join(root, 'docs/toolchain.json'), 'w', encoding='utf-8') as f:
+                  f.write(json.dumps(toolchain, indent=4))
+
+      - name: Checkout arpl-modules
+        run: |
+          sudo rm -rf arpl-modules
+          git clone https://github.com/fbelavenuto/arpl-modules.git arpl-modules
+
+      - name: Get modules lsit
+        shell: python
+        run: |
+          # -*- coding: utf-8 -*-
+          import os, json, kmodule
+
+          root = '' # os.path.dirname(os.path.abspath(__file__))
+
+          if __name__ == '__main__':
+              modulesjs = {}
+              modulesmd = {}
+              try:
+                  platformDirs = os.listdir(os.path.join(root, 'arpl-modules'))
+                  for platformDir in platformDirs:
+                      if platformDir.startswith('.') or '-' not in platformDir:
+                          continue
+                      if os.path.isfile(os.path.join(root, 'arpl-modules', platformDir)):
+                          continue
+                      platformModules = []
+                      modules = os.listdir(os.path.join(root, 'arpl-modules', platformDir))
+                      for module in modules:
+                          if module.startswith('.') or '.ko' not in module:
+                              continue
+                          if os.path.isdir(os.path.join(root, 'arpl-modules', platformDir, module)):
+                              continue
+                          #(
+                          #    {
+                          #        'filename': '/arpl-modules/apollolake-4.4.180/virtio_input.ko', 
+                          #        'author': 'Gerd Hoffmann <kraxel@redhat.com>', 
+                          #        'description': 'Virtio input device driver', 
+                          #        'license': 'GPL', 
+                          #        'depends': 'virtio,virtio_ring', 
+                          #        'retpoline': 'Y', 
+                          #        'vermagic': '4.4.180+ SMP mod_unload ', 
+                          #        'alias': ('virtio:d00000012v*',)
+                          #    },
+                          #)
+                          info = kmodule.modinfo(os.path.join(root, 'arpl-modules', platformDir, module))[0]
+                          info['filename'] = module[:-3]    # module.replace('.ko', '')
+                          platformModules.append(info)
+                          
+                          if not info['filename'] in modulesmd.keys():
+                              modulesmd[info['filename']] = {}
+                          if 'description' in info.keys() and info['description'] != '' and 'description' not in modulesmd[info['filename']]:
+                              modulesmd[info['filename']]['description'] = info['description']
+                          if 'depends' in info.keys() and info['depends'] != '' and 'depends' not in modulesmd[info['filename']]:
+                              modulesmd[info['filename']]['depends'] = info['depends']
+                      modulesjs[platformDir] = platformModules
+
+              except Exception as err:
+                  print(err)
+
+              print(json.dumps(modulesjs, indent=4))
+              with open(os.path.join(root, 'docs/modules.json'), 'w', encoding='utf-8') as f:
+                  f.write(json.dumps(modulesjs, indent=4))
+
+              print(json.dumps(modulesmd, indent=4))
+              with open(os.path.join(root, 'modules.md'), 'w', encoding='utf-8') as f:
+                  for modules in modulesmd.items():
+                      f.write('## ' + modules[0] + '  \n')
+                      if len(modules[1]) > 0:
+                          for info in modules[1].items():
+                              if info[1] != '':
+                                  f.write('>' + info[0] + ': ' + info[1] + '  \n')
+                      else:
+                          f.write('>description: null  \n')
 
       - name: Check and Push
         run: |
-          if [ -n "$(git status -s | grep loads.json)" ]; then
-            git add loads.json
+          git pull
+          status=$(git status -s | grep -E 'exts.json|loads.json|models.json|toolchain.json|modules.json|modules.md' | awk '{printf " %s", $2}')
+          if [ -n "${status}" ]; then
+            git add ${status}
             git commit -m "update $(date +%Y-%m-%d" "%H:%M:%S)"
             git push -f
           fi
